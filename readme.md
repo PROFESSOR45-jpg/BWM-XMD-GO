@@ -14,17 +14,10 @@
 
 <!-- BWM XMD PRO Code -->
 <div align="center" style="background: #000000; padding: 15px; border-radius: 10px; border: 2px solid #ff0000; margin: 20px;">
-  <h3 style="color: #00ffea;">📦 BWM XMD PRO CODE</h3>
+  <h3 style="color: #00ffea;">📦 BWM XMD PRO </h3>
   <div style="background: #111111; padding: 15px; border-radius: 8px; overflow-x: auto;">
     <code style="color: #00ff00; font-size: 14px;">
-      git clone https://github.com/Bwmxmd254/BWM-XMD-PRO.git<br>
-      cd BWM-XMD-PRO<br>
-      npm install<br>
-      node index.js
-    </code>
-  </div>
-</div>
-
+  
 <!-- Banner Image -->
 <p align="center">
   <img src="https://url.bwmxmd.online/Adams.gbv0odfp.jpg" width="100%" height="auto">
