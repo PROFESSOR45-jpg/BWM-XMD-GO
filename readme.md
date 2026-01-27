@@ -18,13 +18,13 @@
     <img title="GET SESSION" src="https://img.shields.io/badge/🔑_GET_SESSION-000000?style=for-the-badge&color=FF0000" width="260" height="50"/>
   </a>
   <a href="https://main.bwmxmd.online/Deploy" target="_blank" rel="noopener noreferrer">
-    <img title="DEPLOY BOT" src="https://img.shields.io/badge/🚀_DEPLOY-000000?style=for-the-badge&color=FF00FF" width="260" height="50"/>
+    <img title="HEROKU" src="https://img.shields.io/badge/🚀_DEPLOY-000000?style=for-the-badge&color=FF00FF" width="260" height="50"/>
   </a>
 </p>
 
 <p align="center">
   <a href="https://render.com" target="_blank" rel="noopener noreferrer">
-    <img title="DEPLOY RENDER" src="https://img.shields.io/badge/🚀_RENDER-000000?style=for-the-badge&color=61DAFB" width="260" height="50"/>
+    <img title="RENDER" src="https://img.shields.io/badge/🚀_RENDER-000000?style=for-the-badge&color=61DAFB" width="260" height="50"/>
   </a>
   <a href="https://main.bwmxmd.online/Panel_files" target="_blank" rel="noopener noreferrer">
     <img title="PANEL FILES" src="https://img.shields.io/badge/📁_PANEL-000000?style=for-the-badge&color=FFA500" width="260" height="50"/>
