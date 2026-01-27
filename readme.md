@@ -18,7 +18,7 @@
     <img title="GET SESSION" src="https://img.shields.io/badge/🔑_GET_SESSION-000000?style=for-the-badge&color=FF0000" width="260" height="50"/>
   </a>
   <a href="https://main.bwmxmd.online/Deploy" target="_blank" rel="noopener noreferrer">
-    <img title="HEROKU" src="https://img.shields.io/badge/🚀_DEPLOY-000000?style=for-the-badge&color=FF00FF" width="260" height="50"/>
+    <img title="HEROKU" src="https://img.shields.io/badge/🚀_HEROKU-000000?style=for-the-badge&color=FF00FF" width="260" height="50"/>
   </a>
 </p>
 
