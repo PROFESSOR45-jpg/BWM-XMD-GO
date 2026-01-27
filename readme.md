@@ -12,12 +12,6 @@
   <img src="https://files.catbox.moe/c07f3s.jpeg" width="210" height="210" style="border-radius:50%; box-shadow:0 0 25px #ff0000;">
 </p>
 
-<!-- BWM XMD PRO Code -->
-<div align="center" style="background: #000000; padding: 15px; border-radius: 10px; border: 2px solid #ff0000; margin: 20px;">
-  <h3 style="color: #00ffea;">📦 BWM XMD PRO </h3>
-  <div style="background: #111111; padding: 15px; border-radius: 8px; overflow-x: auto;">
-    <code style="color: #00ff00; font-size: 14px;">
-  
 <!-- Banner Image -->
 <p align="center">
   <img src="https://url.bwmxmd.online/Adams.gbv0odfp.jpg" width="100%" height="auto">
@@ -61,18 +55,6 @@
     <img src="https://img.shields.io/badge/🌐_WEBSITE-bwmxmd.co.ke-000000?style=for-the-badge" width="340" height="50"/>
   </a>
 </p>
-
-<!-- Quick Commands -->
-<div align="center" style="background: #000000; padding: 15px; border-radius: 10px; border: 2px solid #FF00FF; margin: 20px;">
-  <h3 style="color: #00ffea;">⚡ COMMANDS</h3>
-  <div style="background: #111111; padding: 10px; border-radius: 8px;">
-    <code style="color: #00ff00;">
-      .menu<br>
-      .help<br>
-      .ping
-    </code>
-  </div>
-</div>
 
 <!-- Repo Stats -->
 <p align="center">
