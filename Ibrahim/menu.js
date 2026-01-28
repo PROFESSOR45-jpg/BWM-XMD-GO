@@ -39,12 +39,12 @@ const randomMedia = () => {
 
 const getRandomAudio = async () => {
     try {
-        const response = await axios.get(XMD.NCS_RANDOM);
-        if (
-            response.data.status === "success" &&
-            response.data.data.length > 0
-        ) {
-            return response.data.data[0].links.Bwm_stream_link;
+        const response = await axios.get(XMD.NCS_RANDOM, { timeout: 10000 });
+        if (response.data.status === "success" && response.data.data && response.data.data.length > 0) {
+            return response.data.data[0].links?.Bwm_stream_link || response.data.data[0].links?.stream || null;
+        }
+        if (response.data.result) {
+            return response.data.result;
         }
         return null;
     } catch (error) {
@@ -127,12 +127,19 @@ bwmxmd(
             const time = moment().format("HH:mm:ss");
             const contactName = pushName || "User";
 
-            const contactMessage = getContactMsg(
-                contactName,
-                sender?.split("@")[0] || "0",
-            );
+            let contactMessage;
+            try {
+                contactMessage = getContactMsg(contactName, sender?.split("@")[0] || "0");
+            } catch (e) {
+                contactMessage = mek;
+            }
 
-            const githubStats = await fetchGitHubStats();
+            let githubStats = 500;
+            try {
+                githubStats = await fetchGitHubStats();
+            } catch (e) {
+                console.log("GitHub stats fetch failed, using default");
+            }
 
             const hour = moment().hour();
             let greeting = "🌙 Good Night 😴";
@@ -326,15 +333,8 @@ ${MENU_BOTTOM_DIVIDER}`;
                             try {
                                 const audioUrl = await getRandomAudio();
                                 if (audioUrl) {
-                                    const tempMp3 = path.join(
-                                        "/tmp",
-                                        `menu_song_${Date.now()}.mp3`,
-                                    );
-                                    const tempOgg = path.join(
-                                        "/tmp",
-                                        `menu_song_${Date.now()}.ogg`,
-                                    );
-
+                                    const tempMp3 = path.join("/tmp", `menu_song_${Date.now()}.mp3`);
+                                    
                                     const audioResponse = await axios({
                                         method: "GET",
                                         url: audioUrl,
@@ -342,27 +342,36 @@ ${MENU_BOTTOM_DIVIDER}`;
                                         timeout: 30000,
                                     });
 
-                                    fs.writeFileSync(
-                                        tempMp3,
-                                        Buffer.from(audioResponse.data),
-                                    );
-                                    await convertToOpus(tempMp3, tempOgg);
+                                    fs.writeFileSync(tempMp3, Buffer.from(audioResponse.data));
 
-                                    const audioBuffer =
-                                        fs.readFileSync(tempOgg);
+                                    // Try opus conversion, fallback to mp3 if it fails
+                                    let audioToSend;
+                                    let mimeType = "audio/mpeg";
+                                    const tempOgg = path.join("/tmp", `menu_song_${Date.now()}.ogg`);
+                                    
+                                    try {
+                                        await convertToOpus(tempMp3, tempOgg);
+                                        audioToSend = fs.readFileSync(tempOgg);
+                                        mimeType = "audio/ogg; codecs=opus";
+                                    } catch (convErr) {
+                                        console.log("Opus conversion failed, using mp3:", convErr.message);
+                                        audioToSend = fs.readFileSync(tempMp3);
+                                    }
+
                                     await client.sendMessage(
                                         destChat,
                                         {
-                                            audio: audioBuffer,
-                                            mimetype: "audio/ogg; codecs=opus",
-                                            ptt: true,
+                                            audio: audioToSend,
+                                            mimetype: mimeType,
+                                            ptt: mimeType.includes("opus"),
                                             contextInfo: getGlobalContextInfo(),
                                         },
                                         { quoted: contactMessage },
                                     );
 
-                                    fs.unlinkSync(tempMp3);
-                                    fs.unlinkSync(tempOgg);
+                                    // Cleanup temp files
+                                    try { fs.unlinkSync(tempMp3); } catch (e) {}
+                                    try { fs.unlinkSync(tempOgg); } catch (e) {}
 
                                     await client.sendMessage(
                                         destChat,
@@ -376,21 +385,18 @@ ${MENU_BOTTOM_DIVIDER}`;
                                     await client.sendMessage(
                                         destChat,
                                         {
-                                            text: `❌ Failed to fetch random song. Please try again.\n\n_Reply *0* to go back to main menu_\n\n_For more visit ${XMD.WEB}_`,
+                                            text: `🎵 Random song service is temporarily unavailable.\n\nTry using *.play <song name>* command instead!\n\n_Reply *0* to go back to main menu_\n\n_For more visit ${XMD.WEB}_`,
                                             contextInfo: getGlobalContextInfo(),
                                         },
                                         { quoted: contactMessage },
                                     );
                                 }
                             } catch (audioErr) {
-                                console.error(
-                                    "Menu audio error:",
-                                    audioErr.message,
-                                );
+                                console.error("Menu audio error:", audioErr.message);
                                 await client.sendMessage(
                                     destChat,
                                     {
-                                        text: `❌ Failed to play song. Please try again.\n\n_Reply *0* to go back to main menu_\n\n_For more visit ${XMD.WEB}_`,
+                                        text: `🎵 Random song service is temporarily unavailable.\n\nTry using *.play <song name>* command instead!\n\n_Reply *0* to go back to main menu_\n\n_For more visit ${XMD.WEB}_`,
                                         contextInfo: getGlobalContextInfo(),
                                     },
                                     { quoted: contactMessage },
@@ -478,7 +484,29 @@ ${MENU_BOTTOM_DIVIDER}`;
             setTimeout(cleanup, 300000);
         } catch (err) {
             console.error("Menu error:", err);
-            reply("❌ Failed to load menu. Please try again.");
+            // Send a simple text menu as fallback
+            try {
+                const simpleMenu = `*📋 ${BOT_NAME} MENU*
+
+*1.* 🌐 OUR WEB
+*2.* 🎵 RANDOM SONG  
+*3.* 📢 UPDATES
+*4.* 🤖 AI MENU
+*5.* 🎨 EPHOTO MENU
+*6.* 📥 DOWNLOAD MENU
+*7.* 👨‍👨‍👦‍👦 GROUP MENU
+*8.* ⚙️ SETTINGS MENU
+*9.* 😂 FUN MENU
+*10.* 🌍 GENERAL MENU
+*11.* ⚽ SPORTS MENU
+*12.* 🔍 STALKER MENU
+*13.* 🖼️ STICKER MENU
+
+_Reply with a number (1-13)_`;
+                await client.sendMessage(from, { text: simpleMenu }, { quoted: mek });
+            } catch (fallbackErr) {
+                reply("Menu is temporarily unavailable. Try .help instead.");
+            }
         }
     },
 );
