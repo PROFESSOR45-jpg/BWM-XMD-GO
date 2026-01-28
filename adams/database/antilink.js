@@ -36,25 +36,31 @@ async function initAntiLinkDB() {
 
 async function getAntiLinkSettings() {
     try {
-        const [settings] = await AntiLinkDB.findOrCreate({
-            where: {},
-            defaults: {}
-        });
+        let settings = await AntiLinkDB.findOne();
         
-        const envStatus = process.env.ANTI_LINK;
-        let status = settings?.status || 'off';
-        if (envStatus !== undefined) {
-            const val = envStatus.toLowerCase();
-            if (val === 'on' || val === 'true' || val === 'warn') status = 'warn';
-            else if (val === 'delete') status = 'delete';
-            else if (val === 'remove') status = 'remove';
-            else status = 'off';
+        // If no record exists, create one using env vars as initial defaults
+        if (!settings) {
+            const envStatus = process.env.ANTI_LINK;
+            let initialStatus = 'off';
+            if (envStatus !== undefined) {
+                const val = envStatus.toLowerCase();
+                if (val === 'on' || val === 'true' || val === 'warn') initialStatus = 'warn';
+                else if (val === 'delete') initialStatus = 'delete';
+                else if (val === 'remove') initialStatus = 'remove';
+            }
+            
+            settings = await AntiLinkDB.create({
+                status: initialStatus,
+                action: 'warn',
+                warn_limit: 3
+            });
         }
         
+        // Database values take priority (commands override env vars)
         return {
-            status,
-            action: settings?.action || 'warn',
-            warn_limit: settings?.warn_limit || 3
+            status: settings.status || 'off',
+            action: settings.action || 'warn',
+            warn_limit: settings.warn_limit || 3
         };
     } catch (error) {
         console.error('Error getting antilink settings:', error);
@@ -71,6 +77,31 @@ async function getAntiLinkSettings() {
             action: 'warn', 
             warn_limit: 3
         };
+    }
+}
+
+// Sync settings from Heroku env vars
+async function syncAntiLinkFromEnv() {
+    try {
+        const envStatus = process.env.ANTI_LINK;
+        let status = 'off';
+        if (envStatus !== undefined) {
+            const val = envStatus.toLowerCase();
+            if (val === 'on' || val === 'true' || val === 'warn') status = 'warn';
+            else if (val === 'delete') status = 'delete';
+            else if (val === 'remove') status = 'remove';
+        }
+        
+        let settings = await AntiLinkDB.findOne();
+        if (!settings) {
+            settings = await AntiLinkDB.create({ status });
+        } else {
+            await settings.update({ status });
+        }
+        return { status, action: settings.action, warn_limit: settings.warn_limit };
+    } catch (error) {
+        console.error('Error syncing antilink from env:', error);
+        return null;
     }
 }
 
@@ -106,6 +137,7 @@ module.exports = {
     initAntiLinkDB,
     getAntiLinkSettings,
     updateAntiLinkSettings,
+    syncAntiLinkFromEnv,
     getWarnCount,
     incrementWarnCount,
     resetWarnCount,

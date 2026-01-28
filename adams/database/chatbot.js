@@ -162,42 +162,50 @@ async function getLastConversation(userJid) {
 
 async function getChatbotSettings() {
     try {
-        const [settings] = await ChatbotSettingsDB.findOrCreate({
-            where: {},
-            defaults: {}
-        });
+        let settings = await ChatbotSettingsDB.findOne();
         
-        const envStatus = process.env.CHATBOT;
-        const envMode = process.env.CHATBOT_MODE;
-        const envTrigger = process.env.CHATBOT_TRIGGER;
-        const envResponse = process.env.CHATBOT_RESPONSE;
-        const envVoice = process.env.CHATBOT_VOICE;
-        
-        let status = settings?.status || 'off';
-        let mode = settings?.mode || 'private';
-        
-        if (envStatus !== undefined) {
-            status = (envStatus.toLowerCase() === 'on' || envStatus.toLowerCase() === 'true') ? 'on' : 'off';
-        }
-        if (envMode !== undefined) {
-            const val = envMode.toLowerCase();
-            if (val === 'private' || val === 'group' || val === 'both') {
-                mode = val;
+        // If no record exists, create one using env vars as initial defaults
+        if (!settings) {
+            const envStatus = process.env.CHATBOT;
+            const envMode = process.env.CHATBOT_MODE;
+            const envTrigger = process.env.CHATBOT_TRIGGER;
+            const envResponse = process.env.CHATBOT_RESPONSE;
+            const envVoice = process.env.CHATBOT_VOICE;
+            
+            const initialStatus = envStatus !== undefined 
+                ? ((envStatus.toLowerCase() === 'on' || envStatus.toLowerCase() === 'true') ? 'on' : 'off') 
+                : 'off';
+            
+            let initialMode = 'private';
+            if (envMode !== undefined) {
+                const val = envMode.toLowerCase();
+                if (val === 'private' || val === 'group' || val === 'both') {
+                    initialMode = val;
+                }
             }
+            
+            let initialResponse = 'text';
+            if (envResponse !== undefined) {
+                const val = envResponse.toLowerCase();
+                if (val === 'text' || val === 'audio') initialResponse = val;
+            }
+            
+            settings = await ChatbotSettingsDB.create({
+                status: initialStatus,
+                mode: initialMode,
+                trigger: envTrigger || 'dm',
+                default_response: initialResponse,
+                voice: envVoice || 'Kimberly'
+            });
         }
         
-        let default_response = settings?.default_response || 'text';
-        if (envResponse !== undefined) {
-            const val = envResponse.toLowerCase();
-            if (val === 'text' || val === 'audio') default_response = val;
-        }
-        
+        // Database values take priority (commands override env vars)
         return {
-            status,
-            mode,
-            trigger: envTrigger || settings?.trigger || 'dm',
-            default_response,
-            voice: envVoice || settings?.voice || 'Kimberly'
+            status: settings.status || 'off',
+            mode: settings.mode || 'private',
+            trigger: settings.trigger || 'dm',
+            default_response: settings.default_response || 'text',
+            voice: settings.voice || 'Kimberly'
         };
     } catch (error) {
         console.error('Error getting chatbot settings:', error);
@@ -216,12 +224,60 @@ async function getChatbotSettings() {
     }
 }
 
+// Sync chatbot settings from Heroku env vars
+async function syncChatbotFromEnv() {
+    try {
+        const envStatus = process.env.CHATBOT;
+        const envMode = process.env.CHATBOT_MODE;
+        const envTrigger = process.env.CHATBOT_TRIGGER;
+        const envResponse = process.env.CHATBOT_RESPONSE;
+        const envVoice = process.env.CHATBOT_VOICE;
+        
+        const status = envStatus !== undefined 
+            ? ((envStatus.toLowerCase() === 'on' || envStatus.toLowerCase() === 'true') ? 'on' : 'off') 
+            : 'off';
+        
+        let mode = 'private';
+        if (envMode !== undefined) {
+            const val = envMode.toLowerCase();
+            if (val === 'private' || val === 'group' || val === 'both') {
+                mode = val;
+            }
+        }
+        
+        let default_response = 'text';
+        if (envResponse !== undefined) {
+            const val = envResponse.toLowerCase();
+            if (val === 'text' || val === 'audio') default_response = val;
+        }
+        
+        const updates = {
+            status,
+            mode,
+            trigger: envTrigger || 'dm',
+            default_response,
+            voice: envVoice || 'Kimberly'
+        };
+        
+        let settings = await ChatbotSettingsDB.findOne();
+        if (!settings) {
+            settings = await ChatbotSettingsDB.create(updates);
+        } else {
+            await settings.update(updates);
+        }
+        return updates;
+    } catch (error) {
+        console.error('Error syncing chatbot from env:', error);
+        return null;
+    }
+}
+
 async function updateChatbotSettings(updates) {
     try {
-        const [settings] = await ChatbotSettingsDB.findOrCreate({
-            where: {},
-            defaults: {}
-        });
+        let settings = await ChatbotSettingsDB.findOne();
+        if (!settings) {
+            settings = await ChatbotSettingsDB.create({});
+        }
         return await settings.update(updates);
     } catch (error) {
         console.error('Error updating chatbot settings:', error);
@@ -244,6 +300,7 @@ module.exports = {
     // Settings functions
     getChatbotSettings,
     updateChatbotSettings,
+    syncChatbotFromEnv,
     
     // Voices
     availableVoices,

@@ -36,33 +36,34 @@ async function initAntiStatusMentionDB() {
 
 async function getAntiStatusMentionSettings() {
     try {
-        const [settings] = await AntiStatusMentionDB.findOrCreate({
-            where: {},
-            defaults: {}
-        });
+        let settings = await AntiStatusMentionDB.findOne();
         
-        const envStatus = process.env.ANTI_TAG;
-        const envWarnLimit = process.env.WARN_LIMIT;
-        
-        let status = settings?.status || 'off';
-        let warn_limit = settings?.warn_limit || 3;
-        
-        if (envStatus !== undefined) {
-            const val = envStatus.toLowerCase();
-            if (val === 'on' || val === 'true' || val === 'warn') status = 'warn';
-            else if (val === 'delete') status = 'delete';
-            else if (val === 'remove') status = 'remove';
-            else status = 'off';
+        // If no record exists, create one using env vars as initial defaults
+        if (!settings) {
+            const envStatus = process.env.ANTI_TAG;
+            const envWarnLimit = process.env.WARN_LIMIT;
+            
+            let initialStatus = 'off';
+            if (envStatus !== undefined) {
+                const val = envStatus.toLowerCase();
+                if (val === 'on' || val === 'true' || val === 'warn') initialStatus = 'warn';
+                else if (val === 'delete') initialStatus = 'delete';
+                else if (val === 'remove') initialStatus = 'remove';
+            }
+            const initialWarnLimit = envWarnLimit ? parseInt(envWarnLimit) || 3 : 3;
+            
+            settings = await AntiStatusMentionDB.create({
+                status: initialStatus,
+                action: 'warn',
+                warn_limit: initialWarnLimit
+            });
         }
-        if (envWarnLimit !== undefined) {
-            const limit = parseInt(envWarnLimit);
-            if (!isNaN(limit) && limit > 0) warn_limit = limit;
-        }
         
+        // Database values take priority (commands override env vars)
         return {
-            status,
-            action: settings?.action || 'warn',
-            warn_limit
+            status: settings.status || 'off',
+            action: settings.action || 'warn',
+            warn_limit: settings.warn_limit || 3
         };
     } catch (error) {
         console.error('Error getting anti-status-mention settings:', error);
@@ -80,6 +81,34 @@ async function getAntiStatusMentionSettings() {
             action: 'warn', 
             warn_limit: envWarnLimit ? parseInt(envWarnLimit) || 3 : 3
         };
+    }
+}
+
+// Sync settings from Heroku env vars
+async function syncAntiStatusMentionFromEnv() {
+    try {
+        const envStatus = process.env.ANTI_TAG;
+        const envWarnLimit = process.env.WARN_LIMIT;
+        
+        let status = 'off';
+        if (envStatus !== undefined) {
+            const val = envStatus.toLowerCase();
+            if (val === 'on' || val === 'true' || val === 'warn') status = 'warn';
+            else if (val === 'delete') status = 'delete';
+            else if (val === 'remove') status = 'remove';
+        }
+        const warn_limit = envWarnLimit ? parseInt(envWarnLimit) || 3 : 3;
+        
+        let settings = await AntiStatusMentionDB.findOne();
+        if (!settings) {
+            settings = await AntiStatusMentionDB.create({ status, warn_limit });
+        } else {
+            await settings.update({ status, warn_limit });
+        }
+        return { status, action: settings.action, warn_limit };
+    } catch (error) {
+        console.error('Error syncing anti-status-mention from env:', error);
+        return null;
     }
 }
 
@@ -118,6 +147,7 @@ module.exports = {
     initAntiStatusMentionDB,
     getAntiStatusMentionSettings,
     updateAntiStatusMentionSettings,
+    syncAntiStatusMentionFromEnv,
     getStatusWarnCount,
     incrementStatusWarnCount,
     resetStatusWarnCount,

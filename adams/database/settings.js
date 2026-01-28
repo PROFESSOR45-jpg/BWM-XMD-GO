@@ -46,6 +46,11 @@ const SettingsDB = database.define('settings', {
         type: DataTypes.STRING,
         defaultValue: "BWM-XMD",
         allowNull: false
+    },
+    deviceMode: {
+        type: DataTypes.STRING,
+        defaultValue: "Android",
+        allowNull: false
     }
 }, {
     timestamps: true,
@@ -65,22 +70,37 @@ async function initSettingsDB() {
 async function getSettings() {
     try {
         let settings = await SettingsDB.findOne();
+        
+        // If no record exists, create one using env vars as initial defaults
         if (!settings) {
-            settings = await SettingsDB.create({});
+            settings = await SettingsDB.create({
+                prefix: process.env.PREFIX || ".",
+                author: process.env.AUTHOR || "Ibrahimadams",
+                url: process.env.BOT_URL || "./adams/public/bot-image.jpg",
+                gurl: process.env.GURL || "https://github.com/Bwmxmd254/BWM-XMD-GO",
+                timezone: process.env.TIMEZONE || "Africa/Nairobi",
+                botname: process.env.BOT_NAME || "BWM-XMD",
+                packname: process.env.PACKNAME || "BWM-XMD",
+                mode: process.env.MODE || "public",
+                sessionName: process.env.SESSION_NAME || "BWM-XMD",
+                deviceMode: process.env.DEVICE_MODE || "Android"
+            });
         }
         
         const dbSettings = settings.toJSON();
         
+        // Database values take priority (commands override env vars)
         return {
-            prefix: process.env.PREFIX || dbSettings.prefix,
-            author: process.env.AUTHOR || dbSettings.author,
-            url: process.env.BOT_URL || dbSettings.url,
-            gurl: process.env.GURL || dbSettings.gurl,
-            timezone: process.env.TIMEZONE || dbSettings.timezone,
-            botname: process.env.BOT_NAME || dbSettings.botname,
-            packname: process.env.PACKNAME || dbSettings.packname,
-            mode: process.env.MODE || dbSettings.mode,
-            sessionName: process.env.SESSION_NAME || dbSettings.sessionName
+            prefix: dbSettings.prefix || ".",
+            author: dbSettings.author || "Ibrahimadams",
+            url: dbSettings.url || "./adams/public/bot-image.jpg",
+            gurl: dbSettings.gurl || "https://github.com/Bwmxmd254/BWM-XMD-GO",
+            timezone: dbSettings.timezone || "Africa/Nairobi",
+            botname: dbSettings.botname || "BWM-XMD",
+            packname: dbSettings.packname || "BWM-XMD",
+            mode: dbSettings.mode || "public",
+            sessionName: dbSettings.sessionName || "BWM-XMD",
+            deviceMode: dbSettings.deviceMode || "Android"
         };
     } catch (error) {
         console.error('Error getting settings:', error);
@@ -93,8 +113,38 @@ async function getSettings() {
             botname: process.env.BOT_NAME || "BWM-XMD",
             packname: process.env.PACKNAME || "BWM-XMD",
             mode: process.env.MODE || "public",
-            sessionName: process.env.SESSION_NAME || "BWM-XMD"
+            sessionName: process.env.SESSION_NAME || "BWM-XMD",
+            deviceMode: process.env.DEVICE_MODE || "Android"
         };
+    }
+}
+
+// Sync settings from Heroku env vars
+async function syncSettingsFromEnv() {
+    try {
+        const updates = {
+            prefix: process.env.PREFIX || ".",
+            author: process.env.AUTHOR || "Ibrahimadams",
+            url: process.env.BOT_URL || "./adams/public/bot-image.jpg",
+            gurl: process.env.GURL || "https://github.com/Bwmxmd254/BWM-XMD-GO",
+            timezone: process.env.TIMEZONE || "Africa/Nairobi",
+            botname: process.env.BOT_NAME || "BWM-XMD",
+            packname: process.env.PACKNAME || "BWM-XMD",
+            mode: process.env.MODE || "public",
+            sessionName: process.env.SESSION_NAME || "BWM-XMD",
+            deviceMode: process.env.DEVICE_MODE || "Android"
+        };
+        
+        let settings = await SettingsDB.findOne();
+        if (!settings) {
+            settings = await SettingsDB.create(updates);
+        } else {
+            await settings.update(updates);
+        }
+        return updates;
+    } catch (error) {
+        console.error('Error syncing settings from env:', error);
+        return null;
     }
 }
 
@@ -126,5 +176,6 @@ module.exports = {
     getSettings,
     updateSettings,
     getSetting,
+    syncSettingsFromEnv,
     SettingsDB
 };

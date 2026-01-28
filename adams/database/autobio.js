@@ -28,22 +28,27 @@ async function initAutoBioDB() {
 
 async function getAutoBioSettings() {
     try {
-        const [settings] = await AutoBioDB.findOrCreate({
-            where: {},
-            defaults: {}
-        });
+        let settings = await AutoBioDB.findOne();
         
-        const envStatus = process.env.AUTO_BIO;
-        const envMessage = process.env.AUTO_BIO_MSG;
-        
-        let status = settings?.status || 'on';
-        if (envStatus !== undefined) {
-            status = (envStatus.toLowerCase() === 'on' || envStatus.toLowerCase() === 'true') ? 'on' : 'off';
+        // If no record exists, create one using env vars as initial defaults
+        if (!settings) {
+            const envStatus = process.env.AUTO_BIO;
+            const envMessage = process.env.AUTO_BIO_MSG;
+            
+            const initialStatus = envStatus !== undefined 
+                ? ((envStatus.toLowerCase() === 'on' || envStatus.toLowerCase() === 'true') ? 'on' : 'off') 
+                : 'on';
+            
+            settings = await AutoBioDB.create({
+                status: initialStatus,
+                message: envMessage || 'BWM-XMD Always active!'
+            });
         }
         
+        // Database values take priority (commands override env vars)
         return {
-            status,
-            message: envMessage || settings?.message || 'BWM-XMD Always active!'
+            status: settings.status || 'on',
+            message: settings.message || 'BWM-XMD Always active!'
         };
     } catch (error) {
         console.error('Error getting AutoBio settings:', error);
@@ -56,9 +61,36 @@ async function getAutoBioSettings() {
     }
 }
 
+// Sync settings from Heroku env vars
+async function syncAutoBioFromEnv() {
+    try {
+        const envStatus = process.env.AUTO_BIO;
+        const envMessage = process.env.AUTO_BIO_MSG;
+        
+        const status = envStatus !== undefined 
+            ? ((envStatus.toLowerCase() === 'on' || envStatus.toLowerCase() === 'true') ? 'on' : 'off') 
+            : 'on';
+        const message = envMessage || 'BWM-XMD Always active!';
+        
+        let settings = await AutoBioDB.findOne();
+        if (!settings) {
+            settings = await AutoBioDB.create({ status, message });
+        } else {
+            await settings.update({ status, message });
+        }
+        return { status, message };
+    } catch (error) {
+        console.error('Error syncing autobio from env:', error);
+        return null;
+    }
+}
+
 async function updateAutoBioSettings(updates) {
     try {
-        const settings = await getAutoBioSettings();
+        let settings = await AutoBioDB.findOne();
+        if (!settings) {
+            settings = await AutoBioDB.create({});
+        }
         return await settings.update(updates);
     } catch (error) {
         console.error('Error updating AutoBio settings:', error);
@@ -70,5 +102,6 @@ module.exports = {
     initAutoBioDB,
     getAutoBioSettings,
     updateAutoBioSettings,
+    syncAutoBioFromEnv,
     AutoBioDB
 };

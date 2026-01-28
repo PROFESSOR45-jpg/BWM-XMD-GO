@@ -33,31 +33,34 @@ async function initAntiCallDB() {
 
 async function getAntiCallSettings() {
     try {
-        const settings = await AntiCallDB.findOne();
+        let settings = await AntiCallDB.findOne();
+        
+        // If no record exists, create one using env vars as initial defaults
         if (!settings) {
-            await AntiCallDB.create({});
+            const envStatus = process.env.ANTI_CALL;
+            const envAction = process.env.ANTI_CALL_ACTION;
+            const envMessage = process.env.ANTI_CALL_MSG;
+            
+            const initialStatus = envStatus !== undefined 
+                ? (envStatus.toLowerCase() === 'on' || envStatus.toLowerCase() === 'true')
+                : true;
+            const initialAction = envAction && ['reject', 'block'].includes(envAction.toLowerCase()) 
+                ? envAction.toLowerCase() 
+                : 'reject';
+            const initialMessage = envMessage || 'Call me later 🙏';
+            
+            settings = await AntiCallDB.create({
+                status: initialStatus,
+                action: initialAction,
+                message: initialMessage
+            });
         }
-        const dbSettings = settings || await AntiCallDB.findOne();
         
-        const envStatus = process.env.ANTI_CALL;
-        const envAction = process.env.ANTI_CALL_ACTION;
-        const envMessage = process.env.ANTI_CALL_MSG;
-        
-        let status = dbSettings?.status ?? true;
-        if (envStatus !== undefined) {
-            status = envStatus.toLowerCase() === 'on' || envStatus.toLowerCase() === 'true';
-        }
-        
-        let action = dbSettings?.action || 'reject';
-        if (envAction !== undefined) {
-            const val = envAction.toLowerCase();
-            if (val === 'reject' || val === 'block') action = val;
-        }
-        
+        // Database values take priority (commands override env vars)
         return {
-            status,
-            message: envMessage || dbSettings?.message || 'Call me later 🙏',
-            action
+            status: settings.status,
+            message: settings.message || 'Call me later 🙏',
+            action: settings.action || 'reject'
         };
     } catch (error) {
         console.error('Error getting anti-call settings:', error);
@@ -69,6 +72,34 @@ async function getAntiCallSettings() {
             message: envMessage || 'Call me later 🙏', 
             action: envAction && ['reject', 'block'].includes(envAction.toLowerCase()) ? envAction.toLowerCase() : 'reject' 
         };
+    }
+}
+
+// Sync settings from Heroku env vars (resets database to env values)
+async function syncAntiCallFromEnv() {
+    try {
+        const envStatus = process.env.ANTI_CALL;
+        const envAction = process.env.ANTI_CALL_ACTION;
+        const envMessage = process.env.ANTI_CALL_MSG;
+        
+        const status = envStatus !== undefined 
+            ? (envStatus.toLowerCase() === 'on' || envStatus.toLowerCase() === 'true')
+            : true;
+        const action = envAction && ['reject', 'block'].includes(envAction.toLowerCase()) 
+            ? envAction.toLowerCase() 
+            : 'reject';
+        const message = envMessage || 'Call me later 🙏';
+        
+        let settings = await AntiCallDB.findOne();
+        if (!settings) {
+            settings = await AntiCallDB.create({ status, action, message });
+        } else {
+            await settings.update({ status, action, message });
+        }
+        return { status, action, message };
+    } catch (error) {
+        console.error('Error syncing anti-call from env:', error);
+        return null;
     }
 }
 
@@ -89,5 +120,6 @@ module.exports = {
     initAntiCallDB,
     getAntiCallSettings,
     updateAntiCallSettings,
+    syncAntiCallFromEnv,
     AntiCallDB
 };

@@ -43,24 +43,31 @@ async function initAntiDeleteDB() {
 
 async function getAntiDeleteSettings() {
     try {
-        const settings = await AntiDeleteDB.findOne();
+        let settings = await AntiDeleteDB.findOne();
+        
+        // If no record exists, create one using env vars as initial defaults
         if (!settings) {
-            await AntiDeleteDB.create({});
+            const envStatus = process.env.ANTI_DELETE;
+            const initialStatus = envStatus !== undefined 
+                ? (envStatus.toLowerCase() === 'on' || envStatus.toLowerCase() === 'true')
+                : true;
+            
+            settings = await AntiDeleteDB.create({
+                status: initialStatus,
+                notification: '🗑️ *BWM-XMD AntiDelete*',
+                includeGroupInfo: true,
+                sendToOwner: true,
+                includeMedia: true
+            });
         }
-        const dbSettings = settings || await AntiDeleteDB.findOne();
         
-        const envStatus = process.env.ANTI_DELETE;
-        let status = dbSettings?.status ?? true;
-        if (envStatus !== undefined) {
-            status = envStatus.toLowerCase() === 'on' || envStatus.toLowerCase() === 'true';
-        }
-        
+        // Database values take priority (commands override env vars)
         return {
-            status,
-            notification: dbSettings?.notification || '🗑️ *BWM-XMD AntiDelete*',
-            includeGroupInfo: dbSettings?.includeGroupInfo ?? true,
-            sendToOwner: dbSettings?.sendToOwner ?? true,
-            includeMedia: dbSettings?.includeMedia ?? true
+            status: settings.status,
+            notification: settings.notification || '🗑️ *BWM-XMD AntiDelete*',
+            includeGroupInfo: settings.includeGroupInfo ?? true,
+            sendToOwner: settings.sendToOwner ?? true,
+            includeMedia: settings.includeMedia ?? true
         };
     } catch (error) {
         console.error('Error getting anti-delete settings:', error);
@@ -72,6 +79,27 @@ async function getAntiDeleteSettings() {
             sendToOwner: true,
             includeMedia: true
         };
+    }
+}
+
+// Sync settings from Heroku env vars
+async function syncAntiDeleteFromEnv() {
+    try {
+        const envStatus = process.env.ANTI_DELETE;
+        const status = envStatus !== undefined 
+            ? (envStatus.toLowerCase() === 'on' || envStatus.toLowerCase() === 'true')
+            : true;
+        
+        let settings = await AntiDeleteDB.findOne();
+        if (!settings) {
+            settings = await AntiDeleteDB.create({ status });
+        } else {
+            await settings.update({ status });
+        }
+        return { status, notification: settings.notification, includeGroupInfo: settings.includeGroupInfo, sendToOwner: settings.sendToOwner, includeMedia: settings.includeMedia };
+    } catch (error) {
+        console.error('Error syncing anti-delete from env:', error);
+        return null;
     }
 }
 
@@ -89,5 +117,6 @@ module.exports = {
     initAntiDeleteDB,
     getAntiDeleteSettings,
     updateAntiDeleteSettings,
+    syncAntiDeleteFromEnv,
     AntiDeleteDB
 };

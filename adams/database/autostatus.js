@@ -46,37 +46,32 @@ async function initAutoStatusDB() {
 
 async function getAutoStatusSettings() {
   try {
-    const settings = await AutoStatusDB.findOne();
-    if (!settings) await AutoStatusDB.create({});
-    const dbSettings = settings || await AutoStatusDB.findOne();
+    let settings = await AutoStatusDB.findOne();
     
-    const envView = process.env.AUTO_STATUS_VIEW;
-    const envLike = process.env.AUTO_STATUS_LIKE;
-    const envReply = process.env.AUTO_STATUS_REPLY;
-    
-    let autoviewStatus = dbSettings?.autoviewStatus || 'true';
-    let autoLikeStatus = dbSettings?.autoLikeStatus || 'false';
-    let autoReplyStatus = dbSettings?.autoReplyStatus || 'false';
-    
-    if (envView !== undefined) {
-      autoviewStatus = (envView.toLowerCase() === 'on' || envView.toLowerCase() === 'true') ? 'true' : 'false';
-    }
-    if (envLike !== undefined) {
-      autoLikeStatus = (envLike.toLowerCase() === 'on' || envLike.toLowerCase() === 'true') ? 'true' : 'false';
-    }
-    if (envReply !== undefined) {
-      autoReplyStatus = (envReply.toLowerCase() === 'on' || envReply.toLowerCase() === 'true') ? 'true' : 'false';
+    // If no record exists, create one using env vars as initial defaults
+    if (!settings) {
+      const envView = process.env.AUTO_STATUS_VIEW;
+      const envLike = process.env.AUTO_STATUS_LIKE;
+      const envReply = process.env.AUTO_STATUS_REPLY;
+      const envReplyText = process.env.STATUS_REPLY_MSG;
+      const envLikeEmojis = process.env.STATUS_LIKE_EMOJIS;
+      
+      settings = await AutoStatusDB.create({
+        autoviewStatus: envView ? ((envView.toLowerCase() === 'on' || envView.toLowerCase() === 'true') ? 'true' : 'false') : 'true',
+        autoLikeStatus: envLike ? ((envLike.toLowerCase() === 'on' || envLike.toLowerCase() === 'true') ? 'true' : 'false') : 'false',
+        autoReplyStatus: envReply ? ((envReply.toLowerCase() === 'on' || envReply.toLowerCase() === 'true') ? 'true' : 'false') : 'false',
+        statusReplyText: envReplyText || '✅ Status Viewed By BWM-XMD',
+        statusLikeEmojis: envLikeEmojis || '💛,❤️,💜,🤍,💙'
+      });
     }
     
-    const envReplyText = process.env.STATUS_REPLY_MSG;
-    const envLikeEmojis = process.env.STATUS_LIKE_EMOJIS;
-    
+    // Database values take priority (commands override env vars)
     return {
-      autoviewStatus,
-      autoLikeStatus,
-      autoReplyStatus,
-      statusReplyText: envReplyText || dbSettings?.statusReplyText || '✅ Status Viewed By BWM-XMD',
-      statusLikeEmojis: envLikeEmojis || dbSettings?.statusLikeEmojis || '💛,❤️,💜,🤍,💙'
+      autoviewStatus: settings.autoviewStatus || 'true',
+      autoLikeStatus: settings.autoLikeStatus || 'false',
+      autoReplyStatus: settings.autoReplyStatus || 'false',
+      statusReplyText: settings.statusReplyText || '✅ Status Viewed By BWM-XMD',
+      statusLikeEmojis: settings.statusLikeEmojis || '💛,❤️,💜,🤍,💙'
     };
   } catch (error) {
     console.error('Error getting auto status settings:', error);
@@ -92,6 +87,36 @@ async function getAutoStatusSettings() {
       statusReplyText: envReplyText || '✅ Status Viewed By BWM-XMD',
       statusLikeEmojis: envLikeEmojis || '💛,❤️,💜,🤍,💙'
     };
+  }
+}
+
+// Sync settings from Heroku env vars
+async function syncAutoStatusFromEnv() {
+  try {
+    const envView = process.env.AUTO_STATUS_VIEW;
+    const envLike = process.env.AUTO_STATUS_LIKE;
+    const envReply = process.env.AUTO_STATUS_REPLY;
+    const envReplyText = process.env.STATUS_REPLY_MSG;
+    const envLikeEmojis = process.env.STATUS_LIKE_EMOJIS;
+    
+    const updates = {
+      autoviewStatus: envView ? ((envView.toLowerCase() === 'on' || envView.toLowerCase() === 'true') ? 'true' : 'false') : 'true',
+      autoLikeStatus: envLike ? ((envLike.toLowerCase() === 'on' || envLike.toLowerCase() === 'true') ? 'true' : 'false') : 'false',
+      autoReplyStatus: envReply ? ((envReply.toLowerCase() === 'on' || envReply.toLowerCase() === 'true') ? 'true' : 'false') : 'false',
+      statusReplyText: envReplyText || '✅ Status Viewed By BWM-XMD',
+      statusLikeEmojis: envLikeEmojis || '💛,❤️,💜,🤍,💙'
+    };
+    
+    let settings = await AutoStatusDB.findOne();
+    if (!settings) {
+      settings = await AutoStatusDB.create(updates);
+    } else {
+      await settings.update(updates);
+    }
+    return updates;
+  } catch (error) {
+    console.error('Error syncing auto status from env:', error);
+    return null;
   }
 }
 
@@ -112,5 +137,6 @@ module.exports = {
   initAutoStatusDB,
   getAutoStatusSettings,
   updateAutoStatusSettings,
+  syncAutoStatusFromEnv,
   AutoStatusDB
 };

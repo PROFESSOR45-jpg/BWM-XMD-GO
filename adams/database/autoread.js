@@ -28,21 +28,25 @@ async function initAutoReadDB() {
 
 async function getAutoReadSettings() {
     try {
-        const settings = await AutoReadDB.findOne();
+        let settings = await AutoReadDB.findOne();
+        
+        // If no record exists, create one using env vars as initial defaults
         if (!settings) {
-            await AutoReadDB.create({});
+            const envStatus = process.env.AUTO_READ;
+            const initialStatus = envStatus !== undefined 
+                ? (envStatus.toLowerCase() === 'on' || envStatus.toLowerCase() === 'true')
+                : false;
+            
+            settings = await AutoReadDB.create({
+                status: initialStatus,
+                chatTypes: ['private', 'group']
+            });
         }
-        const dbSettings = settings || await AutoReadDB.findOne();
         
-        const envStatus = process.env.AUTO_READ;
-        let status = dbSettings?.status ?? false;
-        if (envStatus !== undefined) {
-            status = envStatus.toLowerCase() === 'on' || envStatus.toLowerCase() === 'true';
-        }
-        
+        // Database values take priority (commands override env vars)
         return {
-            status,
-            chatTypes: dbSettings?.chatTypes || ['private', 'group']
+            status: settings.status,
+            chatTypes: settings.chatTypes || ['private', 'group']
         };
     } catch (error) {
         console.error('Error getting auto-read settings:', error);
@@ -51,6 +55,27 @@ async function getAutoReadSettings() {
             status: envStatus ? (envStatus.toLowerCase() === 'on' || envStatus.toLowerCase() === 'true') : false, 
             chatTypes: ['private', 'group'] 
         };
+    }
+}
+
+// Sync settings from Heroku env vars
+async function syncAutoReadFromEnv() {
+    try {
+        const envStatus = process.env.AUTO_READ;
+        const status = envStatus !== undefined 
+            ? (envStatus.toLowerCase() === 'on' || envStatus.toLowerCase() === 'true')
+            : false;
+        
+        let settings = await AutoReadDB.findOne();
+        if (!settings) {
+            settings = await AutoReadDB.create({ status, chatTypes: ['private', 'group'] });
+        } else {
+            await settings.update({ status });
+        }
+        return { status, chatTypes: settings.chatTypes || ['private', 'group'] };
+    } catch (error) {
+        console.error('Error syncing auto-read from env:', error);
+        return null;
     }
 }
 
@@ -68,5 +93,6 @@ module.exports = {
     initAutoReadDB,
     getAutoReadSettings,
     updateAutoReadSettings,
+    syncAutoReadFromEnv,
     AutoReadDB
 };

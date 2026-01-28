@@ -1,17 +1,17 @@
 const botRateLimits = new Map();
 
 const ANTI_BAN_CONFIG = {
-    minDelay: 2000,
-    maxDelay: 4000,
-    messagesPerMinute: 20,
-    burstLimit: 3,
-    burstWindow: 15000,
-    cooldownTime: 90000,
-    groupMessageDelay: 3000,
-    statusViewDelay: 4000,
-    typingDuration: 2000,
-    startupDelay: 5000,
-    commandCooldown: 3000,
+    minDelay: 100,
+    maxDelay: 300,
+    messagesPerMinute: 80,
+    burstLimit: 15,
+    burstWindow: 10000,
+    cooldownTime: 15000,
+    groupMessageDelay: 150,
+    statusViewDelay: 500,
+    typingDuration: 300,
+    startupDelay: 1000,
+    commandCooldown: 100,
 };
 
 function getBotLimits(botId) {
@@ -106,18 +106,8 @@ async function safeSendMessage(client, jid, content, options = {}, botId = 'main
         const minDelay = jid.endsWith('@g.us') ? ANTI_BAN_CONFIG.groupMessageDelay : ANTI_BAN_CONFIG.minDelay;
         
         if (timeSince < minDelay) {
-            await sleep(minDelay - timeSince + getRandomDelay(500, 1500));
+            await sleep(minDelay - timeSince);
         }
-        
-        if (content.text && !options.skipTyping) {
-            try {
-                await client.sendPresenceUpdate('composing', jid);
-                await sleep(Math.min(ANTI_BAN_CONFIG.typingDuration, content.text.length * 30 + getRandomDelay(500, 1500)));
-                await client.sendPresenceUpdate('paused', jid);
-            } catch (e) {}
-        }
-        
-        await sleep(getRandomDelay(1000, 2500));
         
         const result = await client.sendMessage(jid, content, options);
         limits.lastMessageTime.set(jid, Date.now());
@@ -172,6 +162,25 @@ function wrapClientWithAntiBan(client, botId = 'main') {
     client.safeBulkSend = (jids, content, options) => safeBulkSend(client, jids, content, options, botId);
     client.checkCommandCooldown = () => checkCommandCooldown(botId);
     
+    client.clearUserSession = async (jid) => {
+        try {
+            const recipientId = jid.split('@')[0];
+            if (client.authState?.keys?.set) {
+                await client.authState.keys.set({ 
+                    'session': { [recipientId]: null },
+                    'sender-key': { [recipientId]: null },
+                    'pre-key': { [recipientId]: null },
+                    'sender-key-memory': { [recipientId]: null }
+                });
+                console.log(`[${botId}] 🔄 All session keys cleared for ${recipientId}`);
+                return true;
+            }
+        } catch (e) {
+            console.log(`[${botId}] Could not clear session: ${e.message}`);
+        }
+        return false;
+    };
+    
     client.sendMessage = async (jid, content, options = {}) => {
         if (options.skipAntiBan) {
             return originalSendMessage(jid, content, options);
@@ -182,16 +191,19 @@ function wrapClientWithAntiBan(client, botId = 'main') {
             return null;
         }
         
+        if (content.delete || content.react) {
+            return originalSendMessage(jid, content, options);
+        }
+        
         const lastTime = limits.lastMessageTime.get(jid) || 0;
         const timeSince = Date.now() - lastTime;
         
-        if (timeSince < 1000) {
-            await sleep(1000 - timeSince + getRandomDelay(300, 800));
+        if (timeSince < 200) {
+            await sleep(200 - timeSince);
         }
         
         const result = await originalSendMessage(jid, content, options);
         limits.lastMessageTime.set(jid, Date.now());
-        
         return result;
     };
     

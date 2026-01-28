@@ -35,30 +35,25 @@ async function initPresenceDB() {
 async function getPresenceSettings() {
     try {
         let settings = await PresenceDB.findOne();
+        
+        // If no record exists, create one using env vars as initial defaults
         if (!settings) {
-            settings = await PresenceDB.create({});
+            const envPrivate = process.env.PRESENCE_PRIVATE;
+            const envGroup = process.env.PRESENCE_GROUP;
+            
+            const privateChat = envPrivate && ['off', 'online', 'typing', 'recording'].includes(envPrivate.toLowerCase()) 
+                ? envPrivate.toLowerCase() : 'off';
+            const groupChat = envGroup && ['off', 'online', 'typing', 'recording'].includes(envGroup.toLowerCase()) 
+                ? envGroup.toLowerCase() : 'off';
+            
+            settings = await PresenceDB.create({ privateChat, groupChat });
         }
         
-        const envPrivate = process.env.PRESENCE_PRIVATE;
-        const envGroup = process.env.PRESENCE_GROUP;
-        
-        let privateChat = settings.privateChat || 'off';
-        let groupChat = settings.groupChat || 'off';
-        
-        if (envPrivate !== undefined) {
-            const val = envPrivate.toLowerCase();
-            if (['off', 'online', 'typing', 'recording'].includes(val)) {
-                privateChat = val;
-            }
-        }
-        if (envGroup !== undefined) {
-            const val = envGroup.toLowerCase();
-            if (['off', 'online', 'typing', 'recording'].includes(val)) {
-                groupChat = val;
-            }
-        }
-        
-        return { privateChat, groupChat };
+        // Database values take priority (commands override env vars)
+        return { 
+            privateChat: settings.privateChat || 'off', 
+            groupChat: settings.groupChat || 'off' 
+        };
     } catch (error) {
         console.error('Error getting presence settings:', error);
         const envPrivate = process.env.PRESENCE_PRIVATE;
@@ -67,6 +62,30 @@ async function getPresenceSettings() {
             privateChat: envPrivate && ['off', 'online', 'typing', 'recording'].includes(envPrivate.toLowerCase()) ? envPrivate.toLowerCase() : 'off', 
             groupChat: envGroup && ['off', 'online', 'typing', 'recording'].includes(envGroup.toLowerCase()) ? envGroup.toLowerCase() : 'off' 
         };
+    }
+}
+
+// Sync settings from Heroku env vars
+async function syncPresenceFromEnv() {
+    try {
+        const envPrivate = process.env.PRESENCE_PRIVATE;
+        const envGroup = process.env.PRESENCE_GROUP;
+        
+        const privateChat = envPrivate && ['off', 'online', 'typing', 'recording'].includes(envPrivate.toLowerCase()) 
+            ? envPrivate.toLowerCase() : 'off';
+        const groupChat = envGroup && ['off', 'online', 'typing', 'recording'].includes(envGroup.toLowerCase()) 
+            ? envGroup.toLowerCase() : 'off';
+        
+        let settings = await PresenceDB.findOne();
+        if (!settings) {
+            settings = await PresenceDB.create({ privateChat, groupChat });
+        } else {
+            await settings.update({ privateChat, groupChat });
+        }
+        return { privateChat, groupChat };
+    } catch (error) {
+        console.error('Error syncing presence from env:', error);
+        return null;
     }
 }
 
@@ -87,5 +106,6 @@ module.exports = {
     initPresenceDB,
     getPresenceSettings,
     updatePresenceSettings,
+    syncPresenceFromEnv,
     PresenceDB
 };
