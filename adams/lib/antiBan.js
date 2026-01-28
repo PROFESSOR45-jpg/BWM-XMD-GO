@@ -1,18 +1,32 @@
-const messageQueue = new Map();
-const lastMessageTime = new Map();
-const messageCounts = new Map();
+const botRateLimits = new Map();
 
 const ANTI_BAN_CONFIG = {
-    minDelay: 1000,
-    maxDelay: 3000,
-    messagesPerMinute: 30,
-    burstLimit: 5,
-    burstWindow: 10000,
-    cooldownTime: 60000,
-    groupMessageDelay: 2000,
-    statusViewDelay: 3000,
-    typingDuration: 1500,
+    minDelay: 2000,
+    maxDelay: 4000,
+    messagesPerMinute: 20,
+    burstLimit: 3,
+    burstWindow: 15000,
+    cooldownTime: 90000,
+    groupMessageDelay: 3000,
+    statusViewDelay: 4000,
+    typingDuration: 2000,
+    startupDelay: 5000,
+    commandCooldown: 3000,
 };
+
+function getBotLimits(botId) {
+    if (!botRateLimits.has(botId)) {
+        botRateLimits.set(botId, {
+            messageCounts: new Map(),
+            lastMessageTime: new Map(),
+            lastCommandTime: 0,
+            isInCooldown: false,
+            totalMessages: 0,
+            startTime: Date.now()
+        });
+    }
+    return botRateLimits.get(botId);
+}
 
 function getRandomDelay(min = ANTI_BAN_CONFIG.minDelay, max = ANTI_BAN_CONFIG.maxDelay) {
     return Math.floor(Math.random() * (max - min + 1)) + min;
@@ -22,15 +36,16 @@ function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-function checkRateLimit(jid) {
+function checkRateLimit(jid, botId = 'main') {
     const now = Date.now();
+    const limits = getBotLimits(botId);
     const key = jid || 'global';
     
-    if (!messageCounts.has(key)) {
-        messageCounts.set(key, { count: 0, windowStart: now, burstCount: 0, burstStart: now });
+    if (!limits.messageCounts.has(key)) {
+        limits.messageCounts.set(key, { count: 0, windowStart: now, burstCount: 0, burstStart: now });
     }
     
-    const stats = messageCounts.get(key);
+    const stats = limits.messageCounts.get(key);
     
     if (now - stats.burstStart > ANTI_BAN_CONFIG.burstWindow) {
         stats.burstCount = 0;
@@ -43,53 +58,78 @@ function checkRateLimit(jid) {
     }
     
     if (stats.burstCount >= ANTI_BAN_CONFIG.burstLimit) {
-        return { allowed: false, waitTime: ANTI_BAN_CONFIG.burstWindow - (now - stats.burstStart) };
+        return { allowed: false, waitTime: ANTI_BAN_CONFIG.burstWindow - (now - stats.burstStart) + getRandomDelay(1000, 3000) };
     }
     
     if (stats.count >= ANTI_BAN_CONFIG.messagesPerMinute) {
-        return { allowed: false, waitTime: 60000 - (now - stats.windowStart) };
+        return { allowed: false, waitTime: 60000 - (now - stats.windowStart) + getRandomDelay(2000, 5000) };
     }
     
     stats.count++;
     stats.burstCount++;
+    limits.totalMessages++;
+    return { allowed: true, waitTime: 0 };
+}
+
+function checkCommandCooldown(botId = 'main') {
+    const now = Date.now();
+    const limits = getBotLimits(botId);
+    const timeSince = now - limits.lastCommandTime;
+    
+    if (timeSince < ANTI_BAN_CONFIG.commandCooldown) {
+        return { allowed: false, waitTime: ANTI_BAN_CONFIG.commandCooldown - timeSince };
+    }
+    
+    limits.lastCommandTime = now;
     return { allowed: true, waitTime: 0 };
 }
 
 async function safeSendMessage(client, jid, content, options = {}, botId = 'main') {
     try {
-        const rateCheck = checkRateLimit(jid);
+        const limits = getBotLimits(botId);
+        
+        if (limits.isInCooldown) {
+            console.log(`[${botId}] 🛑 Bot in cooldown, waiting...`);
+            await sleep(ANTI_BAN_CONFIG.cooldownTime);
+            limits.isInCooldown = false;
+        }
+        
+        const rateCheck = checkRateLimit(jid, botId);
         
         if (!rateCheck.allowed) {
             console.log(`[${botId}] ⏳ Rate limit: waiting ${Math.ceil(rateCheck.waitTime / 1000)}s`);
             await sleep(rateCheck.waitTime);
         }
         
-        const lastTime = lastMessageTime.get(jid) || 0;
+        const lastTime = limits.lastMessageTime.get(jid) || 0;
         const timeSince = Date.now() - lastTime;
         const minDelay = jid.endsWith('@g.us') ? ANTI_BAN_CONFIG.groupMessageDelay : ANTI_BAN_CONFIG.minDelay;
         
         if (timeSince < minDelay) {
-            await sleep(minDelay - timeSince);
+            await sleep(minDelay - timeSince + getRandomDelay(500, 1500));
         }
         
         if (content.text && !options.skipTyping) {
             try {
                 await client.sendPresenceUpdate('composing', jid);
-                await sleep(Math.min(ANTI_BAN_CONFIG.typingDuration, content.text.length * 20));
+                await sleep(Math.min(ANTI_BAN_CONFIG.typingDuration, content.text.length * 30 + getRandomDelay(500, 1500)));
                 await client.sendPresenceUpdate('paused', jid);
             } catch (e) {}
         }
         
-        await sleep(getRandomDelay(500, 1500));
+        await sleep(getRandomDelay(1000, 2500));
         
         const result = await client.sendMessage(jid, content, options);
-        lastMessageTime.set(jid, Date.now());
+        limits.lastMessageTime.set(jid, Date.now());
         
         return result;
     } catch (error) {
-        if (error.message?.includes('rate') || error.data === 429) {
-            console.log(`[${botId}] ⚡ Rate limit hit, cooling down...`);
+        const limits = getBotLimits(botId);
+        if (error.message?.includes('rate') || error.data === 429 || error.message?.includes('spam')) {
+            console.log(`[${botId}] ⚡ Rate limit/spam detected, entering cooldown...`);
+            limits.isInCooldown = true;
             await sleep(ANTI_BAN_CONFIG.cooldownTime);
+            limits.isInCooldown = false;
             return safeSendMessage(client, jid, content, options, botId);
         }
         throw error;
@@ -98,7 +138,7 @@ async function safeSendMessage(client, jid, content, options = {}, botId = 'main
 
 async function safeReact(client, jid, key, emoji, botId = 'main') {
     try {
-        await sleep(getRandomDelay(300, 800));
+        await sleep(getRandomDelay(500, 1500));
         return await client.sendMessage(jid, { react: { text: emoji, key } });
     } catch (error) {
         console.log(`[${botId}] React error:`, error.message);
@@ -117,7 +157,7 @@ async function safeBulkSend(client, jids, content, options = {}, botId = 'main')
         } catch (error) {
             results.push({ jid, success: false, error: error.message });
         }
-        await sleep(getRandomDelay(2000, 5000));
+        await sleep(getRandomDelay(4000, 8000));
     }
     
     return results;
@@ -125,10 +165,12 @@ async function safeBulkSend(client, jids, content, options = {}, botId = 'main')
 
 function wrapClientWithAntiBan(client, botId = 'main') {
     const originalSendMessage = client.sendMessage.bind(client);
+    const limits = getBotLimits(botId);
     
     client.safeSend = (jid, content, options) => safeSendMessage(client, jid, content, options, botId);
     client.safeReact = (jid, key, emoji) => safeReact(client, jid, key, emoji, botId);
     client.safeBulkSend = (jids, content, options) => safeBulkSend(client, jids, content, options, botId);
+    client.checkCommandCooldown = () => checkCommandCooldown(botId);
     
     client.sendMessage = async (jid, content, options = {}) => {
         if (options.skipAntiBan) {
@@ -140,15 +182,15 @@ function wrapClientWithAntiBan(client, botId = 'main') {
             return null;
         }
         
-        const lastTime = lastMessageTime.get(jid) || 0;
+        const lastTime = limits.lastMessageTime.get(jid) || 0;
         const timeSince = Date.now() - lastTime;
         
-        if (timeSince < 500) {
-            await sleep(500 - timeSince + getRandomDelay(100, 300));
+        if (timeSince < 1000) {
+            await sleep(1000 - timeSince + getRandomDelay(300, 800));
         }
         
         const result = await originalSendMessage(jid, content, options);
-        lastMessageTime.set(jid, Date.now());
+        limits.lastMessageTime.set(jid, Date.now());
         
         return result;
     };
@@ -156,9 +198,22 @@ function wrapClientWithAntiBan(client, botId = 'main') {
     return client;
 }
 
-function clearRateLimits() {
-    messageCounts.clear();
-    lastMessageTime.clear();
+function clearRateLimits(botId = null) {
+    if (botId) {
+        botRateLimits.delete(botId);
+    } else {
+        botRateLimits.clear();
+    }
+}
+
+function getBotStats(botId) {
+    const limits = getBotLimits(botId);
+    return {
+        totalMessages: limits.totalMessages,
+        uptime: Date.now() - limits.startTime,
+        isInCooldown: limits.isInCooldown,
+        activeChats: limits.lastMessageTime.size
+    };
 }
 
 module.exports = {
@@ -166,9 +221,12 @@ module.exports = {
     getRandomDelay,
     sleep,
     checkRateLimit,
+    checkCommandCooldown,
     safeSendMessage,
     safeReact,
     safeBulkSend,
     wrapClientWithAntiBan,
     clearRateLimits,
+    getBotStats,
+    getBotLimits,
 };

@@ -38,37 +38,23 @@ async function initGroupEventsDB() {
 
 async function getGroupEventsSettings() {
     try {
-        const settings = await GroupEventsDB.findOne();
+        let settings = await GroupEventsDB.findOne();
         if (!settings) {
-            await GroupEventsDB.create({});
-        }
-        const dbSettings = settings || await GroupEventsDB.findOne();
-        
-        const envEnabled = process.env.WELCOME_GOODBYE;
-        const envWelcome = process.env.WELCOME_MSG;
-        const envGoodbye = process.env.GOODBYE_MSG;
-        const envPromotions = process.env.SHOW_PROMOTIONS;
-        
-        let enabled = dbSettings?.enabled ?? false;
-        if (envEnabled !== undefined) {
-            enabled = envEnabled.toLowerCase() === 'on' || envEnabled.toLowerCase() === 'true';
+            settings = await GroupEventsDB.create({});
         }
         
         return {
-            enabled,
-            welcomeMessage: envWelcome || dbSettings?.welcomeMessage || "Hey @user 👋\nWelcome to *{group}*.\nYou're member #{count}.\nTime: *{time}*\nDescription: {desc}",
-            goodbyeMessage: envGoodbye || dbSettings?.goodbyeMessage || "Goodbye @user 😔\nLeft at: *{time}*\nMembers left: {count}",
-            showPromotions: envPromotions !== undefined ? (envPromotions.toLowerCase() === 'on' || envPromotions.toLowerCase() === 'true') : (dbSettings?.showPromotions ?? true)
+            enabled: settings.enabled ?? false,
+            welcomeMessage: settings.welcomeMessage || "Hey @user 👋\nWelcome to *{group}*.\nYou're member #{count}.\nTime: *{time}*\nDescription: {desc}",
+            goodbyeMessage: settings.goodbyeMessage || "Goodbye @user 😔\nLeft at: *{time}*\nMembers left: {count}",
+            showPromotions: settings.showPromotions ?? true
         };
     } catch (error) {
         console.error('Error getting group events settings:', error);
-        const envEnabled = process.env.WELCOME_GOODBYE;
-        const envWelcome = process.env.WELCOME_MSG;
-        const envGoodbye = process.env.GOODBYE_MSG;
         return { 
-            enabled: envEnabled ? (envEnabled.toLowerCase() === 'on' || envEnabled.toLowerCase() === 'true') : false,
-            welcomeMessage: envWelcome || "Welcome @user to {group}!",
-            goodbyeMessage: envGoodbye || "Goodbye @user!",
+            enabled: false,
+            welcomeMessage: "Welcome @user to {group}!",
+            goodbyeMessage: "Goodbye @user!",
             showPromotions: true
         };
     }
