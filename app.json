@@ -35,7 +35,7 @@
     },
     "BOT_NAME": {
       "description": "Your bot name",
-      "value": "BWM-XMD",
+      "value": "BWM XMD",
       "required": false
     },
     "PREFIX": {

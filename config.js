@@ -5,7 +5,7 @@ if (fs.existsSync('config.env')) {
 }
 const session = process.env.SESSION || '';
 const XMD_CONFIG = require("./adams/xmd");
-const dev = process.env.OWNER_NUMBER || XMD_CONFIG.DEV_NUMBERS[0];
+const dev = process.env.OWNER_NUMBER || '254710772666';
 const { Sequelize } = require('sequelize'); 
 
 
