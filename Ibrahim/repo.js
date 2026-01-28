@@ -86,7 +86,7 @@ bwmxmd({
   category: "General",
   filename: __filename
 }, async (from, client, conText) => {
-  const { mek, q, reply, botname } = conText;
+  const { mek, q, reply, botname, deviceMode } = conText;
 
   if (!q) {
     return reply("❌ Please provide a number to pair.\nExample: .pair 254710772666");
@@ -103,26 +103,37 @@ bwmxmd({
     const code = data.code;
 
     const messageText =
-      `🔑 Pairing Code Generated\n\n` +
+      `🔑 *Pairing Code Generated*\n\n` +
       `• Number: ${q}\n` +
-      `• Code: ${code}\n\n` +
-      `Tap the button below to copy the code.`;
+      `• Code: *${code}*\n\n` +
+      `📋 Copy the code above and paste in WhatsApp pairing.`;
 
-    await sendButtons(client, from, {
-      title: '',
-      text: messageText,
-      footer: `> *${botname}*`,
-      buttons: [
-        {
-          name: "cta_copy",
-          buttonParamsJson: JSON.stringify({
-            display_text: "📋 Copy Pairing Code",
-            id: "copy_pair",
-            copy_code: code
-          })
-        }
-      ]
-    }, { quoted: mek });
+    if (deviceMode === 'iPhone') {
+      await client.sendMessage(from, { text: messageText });
+    } else {
+      try {
+        await sendButtons(client, from, {
+          title: '',
+          text: messageText + `\n\n_Tap button to copy._`,
+          footer: `> *${botname}*`,
+          buttons: [
+            {
+              name: "cta_copy",
+              buttonParamsJson: JSON.stringify({
+                display_text: "📋 Copy Pairing Code",
+                id: "copy_pair",
+                copy_code: code
+              })
+            }
+          ]
+        }, { quoted: mek });
+      } catch (btnErr) {
+        await client.sendMessage(from, {
+          text: messageText,
+          contextInfo: getGlobalContextInfo()
+        }, { quoted: mek });
+      }
+    }
 
   } catch (err) {
     console.error("pair error:", err);
@@ -180,7 +191,7 @@ bwmxmd({
   category: "General",
   filename: __filename
 }, async (from, client, conText) => {
-  const { mek, quotedMsg, reply, botname } = conText;
+  const { mek, quotedMsg, reply, botname, deviceMode } = conText;
 
   if (!quotedMsg) {
     return reply("📌 Reply to a message with `.copy` to generate a copy button.");
@@ -191,27 +202,34 @@ bwmxmd({
     return reply("❌ Could not extract quoted text.");
   }
 
-  try {
-    await sendButtons(client, from, {
-      title: "",
-      text: "*Tap the button below to copy the quoted text👇.*",
-      footer: `> *${botname}*`,
-      buttons: [
-        {
-          name: "cta_copy",
-          buttonParamsJson: JSON.stringify({
-            display_text: "📋 Copy your Quoted Text",
-            id: "copy_text",
-            copy_code: text
-          })
-        }
-      ]
-    }, { quoted: mek });
-  } catch (err) {
-    console.error("❌ Copy command failed:", err);
-    await client.sendMessage(from, {
-      text: "❌ Failed to generate copy button."
-    }, { quoted: mek });
+  const plainText = `📋 *Text to Copy:*\n\n\`\`\`${text}\`\`\`\n\n_Long-press to copy._`;
+
+  if (deviceMode === 'iPhone') {
+    await client.sendMessage(from, { text: plainText });
+  } else {
+    try {
+      await sendButtons(client, from, {
+        title: "",
+        text: plainText,
+        footer: `> *${botname}*`,
+        buttons: [
+          {
+            name: "cta_copy",
+            buttonParamsJson: JSON.stringify({
+              display_text: "📋 Copy Text",
+              id: "copy_text",
+              copy_code: text
+            })
+          }
+        ]
+      }, { quoted: mek });
+    } catch (err) {
+      console.error("Copy button failed, sending plain text:", err.message);
+      await client.sendMessage(from, {
+        text: plainText,
+        contextInfo: getGlobalContextInfo()
+      }, { quoted: mek });
+    }
   }
 });
 
@@ -237,7 +255,7 @@ bwmxmd({
       day: "numeric", month: "short", year: "numeric"
     });
 
-   const repoUrl = 'github.com/Bwmxmd254/BWM-XMD-GO';
+    const repoUrl = botSettings?.gurl || repoData.html_url || 'https://github.com/Bwmxmd254/BWM-XMD-GO';
 
     const messageText =
       `📌 *${BOT_NAME} REPO INFO*\n\n` +
@@ -245,8 +263,8 @@ bwmxmd({
       `🍴 Forks: ${repoData.forks_count * 2}\n` +
       `📅 Created: ${createdDate}\n` +
       `🕰 Updated: ${lastUpdateDate}\n` +
-      `👤 Owner: ${author}\n\n` +
-      `🔗 Repo Url\n ${repoUrl}\n\n` +
+      `👤 Owner: ${author}\n` +
+      `🔗 Repo: ${repoUrl}\n\n` +
       `_Reply *1* for random NCS audio_\n\n` +
       `_For more visit ${XMD.WEB}_`;
 

@@ -245,7 +245,7 @@ bwmxmd({
   description: "Get latest football news",
   filename: __filename
 }, async (from, client, conText) => {
-  const { mek } = conText;
+  const { mek, deviceMode } = conText;
 
   try {
     const apiUrl = XMD.API.SPORTS.NEWS;
@@ -255,6 +255,17 @@ bwmxmd({
     if (!Array.isArray(items) || items.length === 0) return;
 
     const news = items.slice(0, 8);
+    
+    if (deviceMode === 'iPhone') {
+      let textList = `⚽ *${BOT_NAME} - FOOTBALL NEWS*\n\n`;
+      news.forEach((item, i) => {
+        textList += `*${i + 1}.* ${item.title}\n${item.summary?.substring(0, 100)}...\n📅 ${formatDate(item.createdAt)}\n\n`;
+      });
+      textList += `🔗 More: ${XMD.EXTERNAL.KEITH_SPORTS}`;
+      await client.sendMessage(from, { text: textList });
+      return;
+    }
+    
     const cards = await Promise.all(news.map(async (item) => ({
       header: {
         title: `${item.title}`,
@@ -285,20 +296,29 @@ bwmxmd({
       }
     })));
 
-    const message = generateWAMessageFromContent(from, {
-      viewOnceMessage: {
-        message: {
-          messageContextInfo: { deviceListMetadata: {}, deviceListMetadataVersion: 2 },
-          interactiveMessage: {
-            body: { text: `*${BOT_NAME} - FOOTBALL NEWS*` },
-            footer: { text: `Showing ${news.length} stories | ${XMD.WEB}` },
-            carouselMessage: { cards }
+    try {
+      const message = generateWAMessageFromContent(from, {
+        viewOnceMessage: {
+          message: {
+            messageContextInfo: { deviceListMetadata: {}, deviceListMetadataVersion: 2 },
+            interactiveMessage: {
+              body: { text: `*${BOT_NAME} - FOOTBALL NEWS*` },
+              footer: { text: `Showing ${news.length} stories | ${XMD.WEB}` },
+              carouselMessage: { cards }
+            }
           }
         }
-      }
-    }, { quoted: mek });
+      }, { quoted: mek });
 
-    await client.relayMessage(from, message.message, { messageId: message.key.id });
+      await client.relayMessage(from, message.message, { messageId: message.key.id });
+    } catch (carouselErr) {
+      let textList = `⚽ *${BOT_NAME} - FOOTBALL NEWS*\n\n`;
+      news.forEach((item, i) => {
+        textList += `*${i + 1}.* ${item.title}\n${item.summary?.substring(0, 100)}...\n📅 ${formatDate(item.createdAt)}\n\n`;
+      });
+      textList += `🔗 More: ${XMD.EXTERNAL.KEITH_SPORTS}`;
+      await client.sendMessage(from, { text: textList }, { quoted: mek });
+    }
 
   } catch (err) {
     console.error("sportnews error:", err);

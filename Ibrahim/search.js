@@ -241,7 +241,7 @@ bwmxmd({
   description: "Search YouTube videos"
 },
 async (from, client, conText) => {
-  const { q, mek } = conText;
+  const { q, mek, deviceMode } = conText;
   if (!q) return;
 
   try {
@@ -252,6 +252,16 @@ async (from, client, conText) => {
     if (!Array.isArray(results) || results.length === 0) return;
 
     const videos = results.slice(0, 8);
+    
+    if (deviceMode === 'iPhone') {
+      let textList = `🔍 *YouTube Results for:* ${q}\n\n`;
+      videos.forEach((vid, i) => {
+        textList += `*${i + 1}.* ${vid.title}\n📺 ${vid.duration} | 👁️ ${vid.views}\n🔗 ${vid.url}\n\n`;
+      });
+      await client.sendMessage(from, { text: textList });
+      return;
+    }
+    
     const cards = await Promise.all(videos.map(async (vid, i) => ({
       header: {
         title: `🎬 ${vid.title}`,
@@ -284,23 +294,32 @@ async (from, client, conText) => {
       }
     })));
 
-    const message = generateWAMessageFromContent(from, {
-      viewOnceMessage: {
-        message: {
-          messageContextInfo: {
-            deviceListMetadata: {},
-            deviceListMetadataVersion: 2
-          },
-          interactiveMessage: {
-            body: { text: `🔍 YouTube Results for: ${q}` },
-            footer: { text: `📂 Found ${videos.length} videos` },
-            carouselMessage: { cards }
+    try {
+      const message = generateWAMessageFromContent(from, {
+        viewOnceMessage: {
+          message: {
+            messageContextInfo: {
+              deviceListMetadata: {},
+              deviceListMetadataVersion: 2
+            },
+            interactiveMessage: {
+              body: { text: `🔍 YouTube Results for: ${q}` },
+              footer: { text: `📂 Found ${videos.length} videos` },
+              carouselMessage: { cards }
+            }
           }
         }
-      }
-    }, { quoted: mek });
+      }, { quoted: mek });
 
-    await client.relayMessage(from, message.message, { messageId: message.key.id });
+      await client.relayMessage(from, message.message, { messageId: message.key.id });
+    } catch (carouselErr) {
+      let textList = `🔍 *YouTube Results for:* ${q}\n\n`;
+      videos.forEach((vid, i) => {
+        textList += `*${i + 1}.* ${vid.title}\n📺 ${vid.duration} | 👁️ ${vid.views}\n🔗 ${vid.url}\n\n`;
+      });
+      textList += `_If carousel not visible, use links above (iPhone users)_`;
+      await client.sendMessage(from, { text: textList }, { quoted: mek });
+    }
 
   } catch (err) {
     console.error("YTS command error:", err);
@@ -314,7 +333,7 @@ bwmxmd({
   description: "Search and download images"
 },
 async (from, client, conText) => {
-  const { q, mek } = conText;
+  const { q, mek, deviceMode } = conText;
   if (!q) return;
 
   try {
@@ -337,6 +356,16 @@ async (from, client, conText) => {
     }
 
     if (picked.length === 0) return;
+
+    if (deviceMode === 'iPhone') {
+      for (let i = 0; i < Math.min(picked.length, 5); i++) {
+        await client.sendMessage(from, {
+          image: picked[i].buffer,
+          caption: `📸 *Image ${i + 1}/${picked.length}*\n🔗 ${picked[i].directLink}`
+        });
+      }
+      return;
+    }
 
     const cards = await Promise.all(picked.map(async (item, i) => ({
       header: {
@@ -368,23 +397,32 @@ async (from, client, conText) => {
       }
     })));
 
-    const message = generateWAMessageFromContent(from, {
-      viewOnceMessage: {
-        message: {
-          messageContextInfo: {
-            deviceListMetadata: {},
-            deviceListMetadataVersion: 2
-          },
-          interactiveMessage: {
-            body: { text: `🔍 Search Results for: ${q}` },
-            footer: { text: `📂 Found ${picked.length} images` },
-            carouselMessage: { cards }
+    try {
+      const message = generateWAMessageFromContent(from, {
+        viewOnceMessage: {
+          message: {
+            messageContextInfo: {
+              deviceListMetadata: {},
+              deviceListMetadataVersion: 2
+            },
+            interactiveMessage: {
+              body: { text: `🔍 Search Results for: ${q}` },
+              footer: { text: `📂 Found ${picked.length} images` },
+              carouselMessage: { cards }
+            }
           }
         }
-      }
-    }, { quoted: mek });
+      }, { quoted: mek });
 
-    await client.relayMessage(from, message.message, { messageId: message.key.id });
+      await client.relayMessage(from, message.message, { messageId: message.key.id });
+    } catch (carouselErr) {
+      for (let i = 0; i < Math.min(picked.length, 5); i++) {
+        await client.sendMessage(from, {
+          image: picked[i].buffer,
+          caption: `📸 *Image ${i + 1}/${picked.length}*\n🔗 ${picked[i].directLink}`
+        }, { quoted: mek });
+      }
+    }
 
   } catch (err) {
     console.error("Image command error:", err);

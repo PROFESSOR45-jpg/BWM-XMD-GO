@@ -172,6 +172,86 @@ bwmxmd({
 });
 //========================================================================================================================
 
+bwmxmd({
+  pattern: "clearsession",
+  aliases: ["fixsession", "resetsession"],
+  description: "Clear session for a user to fix message delivery issues",
+  category: "Owner",
+  filename: __filename
+}, async (from, client, conText) => {
+  const { q, reply, mek, quoted, sender, isSuperUser } = conText;
+  
+  if (!isSuperUser) return reply("❌ Owner only command");
+  
+  let targetJid = null;
+  let phoneNumber = null;
+  
+  // Priority: phone number provided > quoted message
+  if (q) {
+    let num = q.replace(/[^0-9]/g, '');
+    if (num.length >= 10) {
+      phoneNumber = num;
+      targetJid = num + '@s.whatsapp.net';
+    }
+  }
+  
+  if (!targetJid && quoted) {
+    targetJid = quoted.participant || quoted.sender || mek.message?.extendedTextMessage?.contextInfo?.participant;
+  }
+  
+  if (!targetJid) {
+    return reply("❌ Provide a phone number.\n\nUsage:\n.clearsession 2547XXXXXXXX");
+  }
+  
+  try {
+    const recipientId = targetJid.split('@')[0];
+    let cleared = [];
+    
+    if (client.authState?.keys?.set) {
+      const idsToClean = [];
+      
+      // Always add the phone number if provided
+      if (phoneNumber) {
+        idsToClean.push(phoneNumber);
+      }
+      
+      // Add the recipientId (might be LID format)
+      if (!idsToClean.includes(recipientId)) {
+        idsToClean.push(recipientId);
+      }
+      
+      // If LID format, also add the base number
+      if (recipientId.includes(':')) {
+        const baseId = recipientId.split(':')[0];
+        if (!idsToClean.includes(baseId)) {
+          idsToClean.push(baseId);
+        }
+      }
+      
+      for (const id of idsToClean) {
+        try {
+          await client.authState.keys.set({ 
+            'session': { [id]: null },
+            'sender-key': { [id]: null },
+            'pre-key': { [id]: null },
+            'sender-key-memory': { [id]: null }
+          });
+          cleared.push(id);
+          console.log(`[MAIN] 🔄 Session cleared for ${id}`);
+        } catch (e) {}
+      }
+      
+      return reply(`✅ Sessions cleared for:\n${cleared.map(id => `• ${id}`).join('\n')}\n\nTell them to send a message first, then try commands.`);
+    } else {
+      return reply("❌ Cannot access session store");
+    }
+  } catch (err) {
+    console.error("clearsession error:", err);
+    return reply("❌ Failed to clear session: " + err.message);
+  }
+});
+
+//========================================================================================================================
 
 bwmxmd({
   pattern: "shell",
@@ -301,31 +381,43 @@ bwmxmd({
   category: "Owner",
   filename: __filename
 }, async (from, client, conText) => {
-  const { mek, quoted, quotedMsg, reply } = conText;
+  const { mek, quoted, quotedMsg, reply, deviceMode } = conText;
 
   if (!quotedMsg) return reply("📌 Reply to a media message to retrieve it.");
 
   try {
-    if (quoted?.imageMessage) {
-      const caption = quoted.imageMessage.caption || "";
-      const filePath = await client.downloadAndSaveMediaMessage(quoted.imageMessage);
-      await client.sendMessage(from, { image: { url: filePath }, caption }, { quoted: mek });
+    const isViewOnce = quoted?.viewOnceMessage || quoted?.viewOnceMessageV2 || quoted?.viewOnceMessageV2Extension;
+    const actualQuoted = isViewOnce 
+      ? (quoted.viewOnceMessage?.message || quoted.viewOnceMessageV2?.message || quoted.viewOnceMessageV2Extension?.message || quoted)
+      : quoted;
+    
+    const sendOptions = deviceMode === 'iPhone' ? {} : { quoted: mek };
+    
+    if (actualQuoted?.imageMessage) {
+      const caption = actualQuoted.imageMessage.caption || "";
+      const filePath = await client.downloadAndSaveMediaMessage(actualQuoted.imageMessage);
+      await client.sendMessage(from, { image: { url: filePath }, caption }, sendOptions);
+      return reply(isViewOnce ? "✅ ViewOnce image retrieved!" : "✅ Image retrieved!");
     }
 
-    if (quoted?.videoMessage) {
-      const caption = quoted.videoMessage.caption || "";
-      const filePath = await client.downloadAndSaveMediaMessage(quoted.videoMessage);
-      await client.sendMessage(from, { video: { url: filePath }, caption }, { quoted: mek });
+    if (actualQuoted?.videoMessage) {
+      const caption = actualQuoted.videoMessage.caption || "";
+      const filePath = await client.downloadAndSaveMediaMessage(actualQuoted.videoMessage);
+      await client.sendMessage(from, { video: { url: filePath }, caption }, sendOptions);
+      return reply(isViewOnce ? "✅ ViewOnce video retrieved!" : "✅ Video retrieved!");
     }
 
-    if (quoted?.audioMessage) {
-      const filePath = await client.downloadAndSaveMediaMessage(quoted.audioMessage);
-      await client.sendMessage(from, { audio: { url: filePath }, mimetype: 'audio/mpeg' }, { quoted: mek });
+    if (actualQuoted?.audioMessage) {
+      const filePath = await client.downloadAndSaveMediaMessage(actualQuoted.audioMessage);
+      await client.sendMessage(from, { audio: { url: filePath }, mimetype: 'audio/mpeg' }, sendOptions);
+      return reply(isViewOnce ? "✅ ViewOnce audio retrieved!" : "✅ Audio retrieved!");
     }
+    
+    return reply("❌ No media found in quoted message.");
 
   } catch (err) {
     console.error("vv command error:", err);
-    reply("❌ Failed to retrieve media. Try again.");
+    reply("❌ Failed to retrieve media. Error: " + err.message);
   }
 });
 //========================================================================================================================

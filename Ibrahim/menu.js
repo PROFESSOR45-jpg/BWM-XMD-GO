@@ -117,7 +117,7 @@ bwmxmd(
         description: "Interactive category-based menu",
     },
     async (from, client, conText) => {
-        const { mek, pushName, reply, sender } = conText;
+        const { mek, pushName, reply, sender, deviceMode } = conText;
 
         try {
             const ibrahimCommands = getIbrahimCommands();
@@ -195,7 +195,38 @@ ${MENU_BOTTOM_DIVIDER}`;
             const selectedMedia = randomMedia();
             let mainMenuMsg;
 
-            if (selectedMedia) {
+            if (deviceMode === 'iPhone') {
+                // iPhone mode: Send image with caption (NO contextInfo at all)
+                if (selectedMedia) {
+                    try {
+                        if (selectedMedia.match(/\.(mp4|gif)$/i)) {
+                            mainMenuMsg = await client.sendMessage(
+                                from,
+                                {
+                                    video: { url: selectedMedia },
+                                    gifPlayback: true,
+                                    caption: fullMenuText,
+                                },
+                                { quoted: mek },
+                            );
+                        } else {
+                            mainMenuMsg = await client.sendMessage(
+                                from,
+                                {
+                                    image: { url: selectedMedia },
+                                    caption: fullMenuText,
+                                },
+                                { quoted: mek },
+                            );
+                        }
+                    } catch (mediaErr) {
+                        console.error("iPhone menu media error:", mediaErr.message);
+                        mainMenuMsg = await client.sendMessage(from, { text: fullMenuText }, { quoted: mek });
+                    }
+                } else {
+                    mainMenuMsg = await client.sendMessage(from, { text: fullMenuText }, { quoted: mek });
+                }
+            } else if (selectedMedia) {
                 try {
                     if (selectedMedia.match(/\.(mp4|gif)$/i)) {
                         mainMenuMsg = await client.sendMessage(

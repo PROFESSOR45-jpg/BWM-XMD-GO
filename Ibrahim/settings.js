@@ -1,18 +1,18 @@
 const { bwmxmd } = require('../adams/commandHandler');
-const { getAntiDeleteSettings, updateAntiDeleteSettings } = require('../adams/database/antidelete');
-const { getAntiLinkSettings, updateAntiLinkSettings, clearAllWarns } = require('../adams/database/antilink');
-const { getAntiStatusMentionSettings, updateAntiStatusMentionSettings, clearAllStatusWarns } = require('../adams/database/antistatusmention');
-const { getAutoBioSettings, updateAutoBioSettings } = require('../adams/database/autobio');
-const { getAutoReadSettings, updateAutoReadSettings } = require('../adams/database/autoread');
-const { getAutoStatusSettings, updateAutoStatusSettings } = require('../adams/database/autostatus');
-const { getChatbotSettings, updateChatbotSettings, clearConversationHistory, getConversationHistory, availableVoices } = require('../adams/database/chatbot');
+const { getAntiDeleteSettings, updateAntiDeleteSettings, syncAntiDeleteFromEnv } = require('../adams/database/antidelete');
+const { getAntiLinkSettings, updateAntiLinkSettings, clearAllWarns, syncAntiLinkFromEnv } = require('../adams/database/antilink');
+const { getAntiStatusMentionSettings, updateAntiStatusMentionSettings, clearAllStatusWarns, syncAntiStatusMentionFromEnv } = require('../adams/database/antistatusmention');
+const { getAutoBioSettings, updateAutoBioSettings, syncAutoBioFromEnv } = require('../adams/database/autobio');
+const { getAutoReadSettings, updateAutoReadSettings, syncAutoReadFromEnv } = require('../adams/database/autoread');
+const { getAutoStatusSettings, updateAutoStatusSettings, syncAutoStatusFromEnv } = require('../adams/database/autostatus');
+const { getChatbotSettings, updateChatbotSettings, clearConversationHistory, getConversationHistory, availableVoices, syncChatbotFromEnv } = require('../adams/database/chatbot');
 const axios = require('axios');
 const XMD = require('../adams/xmd');
 const { getGreetSettings, updateGreetSettings, clearRepliedContacts } = require('../adams/database/greet');
-const { getPresenceSettings, updatePresenceSettings } = require('../adams/database/presence');
-const { updateSettings, getSettings } = require('../adams/database/settings');
+const { getPresenceSettings, updatePresenceSettings, syncPresenceFromEnv } = require('../adams/database/presence');
+const { updateSettings, getSettings, syncSettingsFromEnv } = require('../adams/database/settings');
 const { getGroupEventsSettings, updateGroupEventsSettings } = require('../adams/database/groupevents');
-const { getAntiCallSettings, updateAntiCallSettings } = require('../adams/database/anticall');
+const { getAntiCallSettings, updateAntiCallSettings, syncAntiCallFromEnv } = require('../adams/database/anticall');
 
 //========================================================================================================================
 //========================================================================================================================
@@ -242,112 +242,272 @@ async (from, client, conText) => {
 //========================================================================================================================
 bwmxmd({
   pattern: "settings",
-  aliases: ["config", "botconfig"],
+  aliases: ["config", "botconfig", "allsetting"],
   category: "Settings",
-  description: "Manage all bot settings"
+  description: "View all bot settings"
 },
 async (from, client, conText) => {
   const { reply, q, isSuperUser, prefix } = conText;
 
+  if (!isSuperUser) return reply("*Owner only command*");
+
+  try {
+    const [botSettings, statusSettings, readSettings, presenceSettings] = await Promise.all([
+      getSettings(),
+      getAutoStatusSettings(),
+      getAutoReadSettings(),
+      getPresenceSettings()
+    ]);
+    
+    let antideleteSettings = { status: false };
+    let anticallSettings = { status: false, action: 'reject' };
+    let autobioSettings = { enabled: false };
+    let chatbotSettings = { enabled: false };
+    let antilinkSettings = { enabled: false };
+    let antistatusMention = { enabled: false };
+    let groupEvents = { enabled: false };
+    let greetSettings = { enabled: false };
+    
+    try { antideleteSettings = await getAntiDeleteSettings(); } catch (e) {}
+    try { anticallSettings = await getAntiCallSettings(); } catch (e) {}
+    try { autobioSettings = await getAutoBioSettings(); } catch (e) {}
+    try { chatbotSettings = await getChatbotSettings(); } catch (e) {}
+    try { antilinkSettings = await getAntiLinkSettings(); } catch (e) {}
+    try { antistatusMention = await getAntiStatusMentionSettings(); } catch (e) {}
+    try { groupEvents = await getGroupEventsSettings(); } catch (e) {}
+    try { greetSettings = await getGreetSettings(); } catch (e) {}
+    
+    const on = 'ON';
+    const off = 'OFF';
+    
+    let msg = `*BWM-XMD SETTINGS*\n\n`;
+    
+    msg += `*BOT*\n`;
+    msg += `> Prefix: ${botSettings.prefix}\n`;
+    msg += `> Name: ${botSettings.botname}\n`;
+    msg += `> Mode: ${botSettings.mode}\n`;
+    msg += `> Device: ${botSettings.deviceMode}\n`;
+    msg += `> Pack: ${botSettings.packname}\n`;
+    msg += `> Author: ${botSettings.author}\n`;
+    msg += `> Timezone: ${botSettings.timezone}\n`;
+    msg += `> URL: ${botSettings.url || 'Not set'}\n`;
+    msg += `> GitHub: ${botSettings.gurl || 'Not set'}\n\n`;
+    
+    msg += `*STATUS*\n`;
+    msg += `> Auto View: ${statusSettings.autoviewStatus === 'true' ? on : off}\n`;
+    msg += `> Auto Like: ${statusSettings.autoLikeStatus === 'true' ? on : off}\n`;
+    msg += `> Auto Reply: ${statusSettings.autoReplyStatus === 'true' ? on : off}\n`;
+    msg += `> Like Emojis: ${statusSettings.statusLikeEmojis}\n`;
+    msg += `> Reply Text: ${(statusSettings.statusReplyText || '').slice(0, 30)}\n\n`;
+    
+    msg += `*AUTO*\n`;
+    msg += `> Auto Read: ${readSettings.status ? on : off}\n`;
+    msg += `> Auto Bio: ${autobioSettings.enabled ? on : off}\n`;
+    msg += `> Bio Text: ${(autobioSettings.text || '').slice(0, 30) || 'Not set'}\n`;
+    msg += `> Chatbot: ${chatbotSettings.enabled ? on : off}\n\n`;
+    
+    msg += `*PRESENCE*\n`;
+    msg += `> DM: ${presenceSettings.privateChat}\n`;
+    msg += `> Group: ${presenceSettings.groupChat}\n\n`;
+    
+    msg += `*ANTI DELETE*\n`;
+    msg += `> Status: ${antideleteSettings.status ? on : off}\n`;
+    msg += `> Send to Owner: ${antideleteSettings.sendToOwner ? on : off}\n`;
+    msg += `> Include Media: ${antideleteSettings.includeMedia ? on : off}\n`;
+    msg += `> Group Info: ${antideleteSettings.includeGroupInfo ? on : off}\n\n`;
+    
+    msg += `*ANTI CALL*\n`;
+    msg += `> Status: ${anticallSettings.status ? on : off}\n`;
+    msg += `> Action: ${anticallSettings.action || 'reject'}\n`;
+    msg += `> Message: ${(anticallSettings.message || '').slice(0, 25) || 'Default'}\n\n`;
+    
+    msg += `*ANTI LINK*\n`;
+    msg += `> Status: ${antilinkSettings.enabled ? on : off}\n`;
+    msg += `> Action: ${antilinkSettings.action || 'warn'}\n`;
+    msg += `> Warn Limit: ${antilinkSettings.warnLimit || 3}\n\n`;
+    
+    msg += `*ANTI TAG*\n`;
+    msg += `> Status: ${antistatusMention.enabled ? on : off}\n\n`;
+    
+    msg += `*GROUP*\n`;
+    msg += `> Welcome/Bye: ${groupEvents.enabled ? on : off}\n`;
+    msg += `> Greet: ${greetSettings.enabled ? on : off}\n\n`;
+    
+    msg += `*COMMANDS*\n`;
+    msg += `${prefix}autoview on/off\n`;
+    msg += `${prefix}antidelete on/off\n`;
+    msg += `${prefix}anticall on/off\n`;
+    msg += `${prefix}antilink on/off\n`;
+    msg += `${prefix}events on/off`;
+    
+    return reply(msg);
+  } catch (err) {
+    console.error("Settings error:", err);
+    return reply("*Failed to load settings*");
+  }
+});
+//========================================================================================================================
+bwmxmd({
+  pattern: "syncsettings",
+  aliases: ["syncenv", "resetsettings", "syncheroku"],
+  category: "Settings",
+  description: "Reset all settings to Heroku environment variable values"
+},
+async (from, client, conText) => {
+  const { reply, q, isSuperUser, prefix, isSubBot } = conText;
+
   if (!isSuperUser) return reply("❌ Owner Only Command!");
+  
+  if (isSubBot) {
+    return reply("❌ This command is only for the main bot. Sub-bots use their own database settings.");
+  }
 
-  const args = q?.trim().split(/\s+/) || [];
-  const action = args[0]?.toLowerCase();
-  const key = args[1]?.toLowerCase();
-  const value = args.slice(2).join(" ");
-
-  const settings = await getSettings();
-
-  if (!action) {
+  const args = q?.trim().toLowerCase();
+  
+  if (!args) {
     return reply(
-      `*⚙️ Bot Settings*\n\n` +
-      `🔹 *Prefix:* \`${settings.prefix}\`\n` +
-      `🔹 *Mode:* ${settings.mode.toUpperCase()}\n` +
-      `🔹 *Bot Name:* ${settings.botname}\n` +
-      `🔹 *Author:* ${settings.author}\n` +
-      `🔹 *Packname:* ${settings.packname}\n` +
-      `🔹 *Timezone:* ${settings.timezone}\n` +
-      `🔹 *URL:* ${settings.url || '❌ Not Set'}\n` +
-      `🔹 *GitHub:* ${settings.gurl || '❌ Not Set'}\n\n` +
+      `*🔄 Sync Settings from Heroku*\n\n` +
+      `This command resets your bot settings to match your Heroku environment variables.\n\n` +
+      `*⚠️ Warning:* This will override any changes you made via bot commands!\n\n` +
       `*🛠 Usage:*\n` +
-      `▸ ${settings.prefix}settings list\n` +
-      `▸ ${settings.prefix}settings set <key> <value>\n` +
-      `▸ ${settings.prefix}settings reset`
+      `▸ ${prefix}syncsettings all - Reset ALL settings\n` +
+      `▸ ${prefix}syncsettings anticall - Reset anti-call only\n` +
+      `▸ ${prefix}syncsettings antidelete - Reset anti-delete only\n` +
+      `▸ ${prefix}syncsettings antilink - Reset anti-link only\n` +
+      `▸ ${prefix}syncsettings autostatus - Reset auto-status only\n` +
+      `▸ ${prefix}syncsettings autoread - Reset auto-read only\n` +
+      `▸ ${prefix}syncsettings autobio - Reset auto-bio only\n` +
+      `▸ ${prefix}syncsettings presence - Reset presence only\n` +
+      `▸ ${prefix}syncsettings chatbot - Reset chatbot only\n` +
+      `▸ ${prefix}syncsettings bot - Reset bot config only\n\n` +
+      `*💡 Tip:* Use this after changing Heroku vars to apply them!`
     );
   }
 
-  switch (action) {
-    case 'list':
+  try {
+    let synced = [];
+    
+    if (args === 'all' || args === 'anticall') {
+      await syncAntiCallFromEnv();
+      synced.push('Anti-Call');
+    }
+    if (args === 'all' || args === 'antidelete') {
+      await syncAntiDeleteFromEnv();
+      synced.push('Anti-Delete');
+    }
+    if (args === 'all' || args === 'antilink') {
+      await syncAntiLinkFromEnv();
+      synced.push('Anti-Link');
+    }
+    if (args === 'all' || args === 'autostatus') {
+      await syncAutoStatusFromEnv();
+      synced.push('Auto-Status');
+    }
+    if (args === 'all' || args === 'autoread') {
+      await syncAutoReadFromEnv();
+      synced.push('Auto-Read');
+    }
+    if (args === 'all' || args === 'autobio') {
+      await syncAutoBioFromEnv();
+      synced.push('Auto-Bio');
+    }
+    if (args === 'all' || args === 'presence') {
+      await syncPresenceFromEnv();
+      synced.push('Presence');
+    }
+    if (args === 'all' || args === 'antistatusmention' || args === 'antitag') {
+      await syncAntiStatusMentionFromEnv();
+      synced.push('Anti-Status-Mention');
+    }
+    if (args === 'all' || args === 'chatbot') {
+      await syncChatbotFromEnv();
+      synced.push('Chatbot');
+    }
+    if (args === 'all' || args === 'bot' || args === 'config') {
+      await syncSettingsFromEnv();
+      synced.push('Bot Config');
+    }
+    
+    if (synced.length === 0) {
       return reply(
-        `*📋 Available Settings:*\n\n` +
-        `▸ prefix - Bot command prefix\n` +
-        `▸ mode - Bot mode (public/private)\n` +
-        `▸ botname - Bot display name\n` +
-        `▸ author - Bot author name\n` +
-        `▸ packname - Sticker pack name\n` +
-        `▸ timezone - Timezone for bot\n` +
-        `▸ url - Bot profile picture URL\n` +
-        `▸ gurl - GitHub/Repo URL`
+        `❌ Unknown setting: "${args}"\n\n` +
+        `Available: all, anticall, antidelete, antilink, autostatus, autoread, autobio, presence, antitag, chatbot, bot`
       );
+    }
+    
+    return reply(
+      `✅ *Settings Synced from Heroku!*\n\n` +
+      `🔄 Updated: ${synced.join(', ')}\n\n` +
+      `Your bot now uses the values from your Heroku environment variables.`
+    );
+  } catch (error) {
+    console.error('Sync settings error:', error);
+    return reply(`❌ Error syncing settings: ${error.message}`);
+  }
+});
+//========================================================================================================================
+bwmxmd({
+  pattern: "devicemode",
+  aliases: ["iphonemode", "iphone", "android", "device"],
+  category: "Settings",
+  description: "Set device mode - iPhone (plain text) or Android (full features)"
+},
+async (from, client, conText) => {
+  const { reply, q, isSuperUser, botSettings, prefix } = conText;
 
-    case 'set':
-      if (!key || !value) {
-        return reply("❌ Usage: settings set <key> <value>");
-      }
+  if (!isSuperUser) return reply("❌ Owner Only Command!");
 
-      const validKeys = ['prefix', 'mode', 'botname', 'author', 'packname', 'timezone', 'url', 'gurl'];
-      if (!validKeys.includes(key)) {
-        return reply(`❌ Invalid setting! Available: ${validKeys.join(', ')}`);
-      }
+  const currentMode = botSettings?.deviceMode || "Android";
+  const args = q?.trim().toLowerCase();
 
-      // Validation for specific keys
-      if (key === 'prefix' && value.length > 3) {
-        return reply("❌ Prefix must be 1-3 characters long!");
-      }
+  if (!args) {
+    return reply(
+      `📱 *Device Mode*\n\n` +
+      `Current: ${currentMode === 'iPhone' ? '🍎 iPhone' : '🤖 Android'}\n\n` +
+      `*🍎 iPhone Mode:*\n` +
+      `• Plain text only (no buttons)\n` +
+      `• No carousels or contextInfo\n` +
+      `• ViewOnce media re-sent as normal\n` +
+      `• Works for all iPhone users\n\n` +
+      `*🤖 Android Mode:*\n` +
+      `• Full features (buttons, carousels)\n` +
+      `• Context info and thumbnails\n` +
+      `• Quoted messages styled\n\n` +
+      `*Usage:*\n` +
+      `▸ ${prefix}devicemode iphone\n` +
+      `▸ ${prefix}devicemode android`
+    );
+  }
 
-      if (key === 'mode' && !['public', 'private'].includes(value.toLowerCase())) {
-        return reply("❌ Mode must be 'public' or 'private'!");
-      }
-
-      try {
-        const updateData = { [key]: value };
-        await updateSettings(updateData);
-        // Update the botSettings in context
-        conText.botSettings[key] = value;
-        return reply(`✅ Setting *${key}* updated to:\n${value}`);
-      } catch (error) {
-        return reply("❌ Failed to update setting!");
-      }
-      break;
-
-    case 'reset':
-      try {
-        const defaultSettings = {
-          prefix: ".",
-          author: "Ibrahimadams",
-          url: XMD.CATBOX_IMG,
-          gurl: XMD.GURL,
-          timezone: "Africa/Nairobi",
-          botname: "BWM-XMD",
-          packname: "BWM-XMD",
-          mode: "public"
-        };
-        await updateSettings(defaultSettings);
-        // Update all settings in context
-        Object.assign(conText.botSettings, defaultSettings);
-        return reply("✅ All settings reset to default values!");
-      } catch (error) {
-        return reply("❌ Failed to reset settings!");
-      }
-      break;
-
-    default:
+  try {
+    if (args === 'iphone' || args === 'ios' || args === 'apple') {
+      await updateSettings({ deviceMode: 'iPhone' });
+      conText.botSettings.deviceMode = 'iPhone';
       return reply(
-        "❌ Invalid subcommand. Options:\n\n" +
-        `▸ ${settings.prefix}settings list\n` +
-        `▸ ${settings.prefix}settings set <key> <value>\n` +
-        `▸ ${settings.prefix}settings reset`
+        `🍎 *Device Mode: iPhone*\n\n` +
+        `Bot will now send iPhone-compatible messages:\n` +
+        `• Plain text only\n` +
+        `• No buttons or carousels\n` +
+        `• ViewOnce sent as normal media\n\n` +
+        `_All iPhone users can now see everything!_`
       );
+    } else if (args === 'android' || args === 'full' || args === 'normal') {
+      await updateSettings({ deviceMode: 'Android' });
+      conText.botSettings.deviceMode = 'Android';
+      return reply(
+        `🤖 *Device Mode: Android*\n\n` +
+        `Bot will use full features:\n` +
+        `• Buttons and carousels\n` +
+        `• Context info and thumbnails\n` +
+        `• Quoted messages\n\n` +
+        `_Android users will see all features!_`
+      );
+    } else {
+      return reply(`❌ Invalid option.\n\nUse:\n▸ ${prefix}devicemode iphone\n▸ ${prefix}devicemode android`);
+    }
+  } catch (error) {
+    console.error('Device mode error:', error);
+    return reply(`❌ Error: ${error.message}`);
   }
 });
 //========================================================================================================================
@@ -1724,4 +1884,339 @@ async (from, client, conText) => {
 //========================================================================================================================
 //========================================================================================================================
 
-                                                
+bwmxmd({
+  pattern: "allvar",
+  react: "📊",
+  aliases: ["getallvar", "vars", "listvars", "varlist", "allsettings"],
+  category: "Settings",
+  description: "View all bot variables and settings"
+},
+async (from, client, conText) => {
+  const { reply, isSuperUser } = conText;
+
+  if (!isSuperUser) return reply("*Owner only command*");
+
+  try {
+    const [botSettings, statusSettings, readSettings, presenceSettings] = await Promise.all([
+      getSettings(),
+      getAutoStatusSettings(),
+      getAutoReadSettings(),
+      getPresenceSettings()
+    ]);
+    
+    let antideleteSettings = { status: false };
+    let anticallSettings = { status: false, action: 'reject' };
+    let autobioSettings = { enabled: false, text: '' };
+    
+    try { antideleteSettings = await getAntiDeleteSettings(); } catch (e) {}
+    try { anticallSettings = await getAntiCallSettings(); } catch (e) {}
+    try { autobioSettings = await getAutoBioSettings(); } catch (e) {}
+    
+    const uptime = process.uptime();
+    const hours = Math.floor(uptime / 3600);
+    const mins = Math.floor((uptime % 3600) / 60);
+    const memUsage = Math.round(process.memoryUsage().heapUsed / 1024 / 1024);
+    
+    let msg = `*BWM-XMD ALL VARIABLES*\n`;
+    msg += `━━━━━━━━━━━━━━━━━━━━━\n\n`;
+    
+    msg += `*BOT CONFIG*\n`;
+    msg += `├ prefix: \`${botSettings.prefix}\`\n`;
+    msg += `├ botname: ${botSettings.botname}\n`;
+    msg += `├ mode: ${botSettings.mode}\n`;
+    msg += `├ deviceMode: ${botSettings.deviceMode}\n`;
+    msg += `├ packname: ${botSettings.packname}\n`;
+    msg += `├ author: ${botSettings.author}\n`;
+    msg += `└ timezone: ${botSettings.timezone}\n\n`;
+    
+    msg += `*STATUS*\n`;
+    msg += `├ autoviewStatus: ${statusSettings.autoviewStatus === 'true' ? 'ON' : 'OFF'}\n`;
+    msg += `├ autoLikeStatus: ${statusSettings.autoLikeStatus === 'true' ? 'ON' : 'OFF'}\n`;
+    msg += `├ autoReplyStatus: ${statusSettings.autoReplyStatus === 'true' ? 'ON' : 'OFF'}\n`;
+    msg += `├ statusLikeEmojis: ${statusSettings.statusLikeEmojis}\n`;
+    msg += `└ statusReplyText: ${(statusSettings.statusReplyText || '').slice(0, 25)}...\n\n`;
+    
+    msg += `*AUTO FEATURES*\n`;
+    msg += `├ autoread: ${readSettings.status ? 'ON' : 'OFF'}\n`;
+    msg += `└ autobio: ${autobioSettings.enabled ? 'ON' : 'OFF'}\n\n`;
+    
+    msg += `*PRESENCE*\n`;
+    msg += `├ privateChat: ${presenceSettings.privateChat}\n`;
+    msg += `└ groupChat: ${presenceSettings.groupChat}\n\n`;
+    
+    msg += `*PROTECTION*\n`;
+    msg += `├ antidelete: ${antideleteSettings.status ? 'ON' : 'OFF'}\n`;
+    msg += `├ anticall: ${anticallSettings.status ? 'ON' : 'OFF'}\n`;
+    msg += `└ anticallAction: ${anticallSettings.action}\n\n`;
+    
+    msg += `*SYSTEM*\n`;
+    msg += `├ uptime: ${hours}h ${mins}m\n`;
+    msg += `├ memory: ${memUsage}MB\n`;
+    msg += `└ node: ${process.version}\n\n`;
+    
+    msg += `━━━━━━━━━━━━━━━━━━━━━\n`;
+    msg += `*.getvar <key>* - Get specific var\n`;
+    msg += `*.setvar key=value* - Set var`;
+    
+    return reply(msg);
+  } catch (err) {
+    console.error("Allvar error:", err);
+    return reply("*Failed to load variables*");
+  }
+});
+
+bwmxmd({
+  pattern: "getvar",
+  react: "📋",
+  aliases: ["var", "gv", "get"],
+  category: "Settings",
+  description: "Get a specific variable value"
+},
+async (from, client, conText) => {
+  const { q, reply, isSuperUser } = conText;
+
+  if (!isSuperUser) return reply("*Owner only command*");
+
+  if (!q) {
+    return reply(
+      `*Usage:* .getvar <variable>\n\n` +
+      `*Available Variables:*\n` +
+      `prefix, botname, mode, deviceMode, packname, author, timezone, ` +
+      `autoviewStatus, autoLikeStatus, autoReplyStatus, autoread, autobio, ` +
+      `privateChat, groupChat, antidelete, anticall`
+    );
+  }
+
+  const varName = q.toLowerCase().trim();
+
+  try {
+    const [botSettings, statusSettings, readSettings, presenceSettings] = await Promise.all([
+      getSettings(),
+      getAutoStatusSettings(),
+      getAutoReadSettings(),
+      getPresenceSettings()
+    ]);
+    
+    let antideleteSettings = { status: false };
+    let anticallSettings = { status: false, action: 'reject' };
+    let autobioSettings = { enabled: false };
+    
+    try { antideleteSettings = await getAntiDeleteSettings(); } catch (e) {}
+    try { anticallSettings = await getAntiCallSettings(); } catch (e) {}
+    try { autobioSettings = await getAutoBioSettings(); } catch (e) {}
+    
+    const allVars = {
+      prefix: botSettings.prefix,
+      botname: botSettings.botname,
+      mode: botSettings.mode,
+      devicemode: botSettings.deviceMode,
+      packname: botSettings.packname,
+      author: botSettings.author,
+      timezone: botSettings.timezone,
+      url: botSettings.url,
+      gurl: botSettings.gurl,
+      autoviewstatus: statusSettings.autoviewStatus === 'true' ? 'ON' : 'OFF',
+      autolikestatus: statusSettings.autoLikeStatus === 'true' ? 'ON' : 'OFF',
+      autoreplystatus: statusSettings.autoReplyStatus === 'true' ? 'ON' : 'OFF',
+      statuslikeemojis: statusSettings.statusLikeEmojis,
+      statusreplytext: statusSettings.statusReplyText,
+      autoread: readSettings.status ? 'ON' : 'OFF',
+      autobio: autobioSettings.enabled ? 'ON' : 'OFF',
+      privatechat: presenceSettings.privateChat,
+      groupchat: presenceSettings.groupChat,
+      antidelete: antideleteSettings.status ? 'ON' : 'OFF',
+      anticall: anticallSettings.status ? 'ON' : 'OFF',
+      anticallaction: anticallSettings.action
+    };
+    
+    if (allVars.hasOwnProperty(varName)) {
+      return reply(
+        `*Variable Info*\n━━━━━━━━━━━━━━\n\n` +
+        `*Name:* ${varName}\n` +
+        `*Value:* ${allVars[varName]}`
+      );
+    }
+    
+    const matchingVars = Object.keys(allVars).filter(k => k.includes(varName));
+    if (matchingVars.length > 0) {
+      let msg = `*Did you mean?*\n\n`;
+      matchingVars.forEach(v => {
+        msg += `*${v}:* ${allVars[v]}\n`;
+      });
+      return reply(msg);
+    }
+    
+    return reply(`*Variable "${varName}" not found*\n\nUse \`.allvar\` to see all variables`);
+  } catch (err) {
+    console.error("Getvar error:", err);
+    return reply("*Failed to get variable*");
+  }
+});
+
+bwmxmd({
+  pattern: "setvar",
+  react: "✏️",
+  aliases: ["sv", "setv"],
+  category: "Settings",
+  description: "Set a variable value"
+},
+async (from, client, conText) => {
+  const { q, reply, isSuperUser, botSettings: ctxSettings } = conText;
+
+  if (!isSuperUser) return reply("*Owner only command*");
+
+  if (!q || !q.includes('=')) {
+    return reply(
+      `*Usage:* .setvar <variable>=<value>\n\n` +
+      `*Examples:*\n` +
+      `.setvar prefix=!\n` +
+      `.setvar botname=MyBot\n` +
+      `.setvar mode=private\n` +
+      `.setvar deviceMode=iPhone\n` +
+      `.setvar autoviewstatus=on\n` +
+      `.setvar privatechat=typing`
+    );
+  }
+
+  const [varName, ...valueParts] = q.split('=');
+  const value = valueParts.join('=').trim();
+  const key = varName.toLowerCase().trim();
+
+  if (!value) return reply("*Value cannot be empty*");
+
+  try {
+    const botVars = ['prefix', 'botname', 'mode', 'devicemode', 'packname', 'author', 'timezone', 'url', 'gurl', 'sessionname'];
+    const statusVars = ['autoviewstatus', 'autolikestatus', 'autoreplystatus', 'statuslikeemojis', 'statusreplytext'];
+    const presenceVars = ['privatechat', 'groupchat'];
+    
+    let success = false;
+    let displayName = key;
+
+    if (botVars.includes(key)) {
+      const keyMap = {
+        'devicemode': 'deviceMode',
+        'sessionname': 'sessionName'
+      };
+      const updateKey = keyMap[key] || key;
+      await updateSettings({ [updateKey]: value });
+      if (ctxSettings) ctxSettings[updateKey] = value;
+      displayName = updateKey;
+      success = true;
+    } else if (statusVars.includes(key)) {
+      const statusKeyMap = {
+        'autoviewstatus': 'autoviewStatus',
+        'autolikestatus': 'autoLikeStatus',
+        'autoreplystatus': 'autoReplyStatus',
+        'statuslikeemojis': 'statusLikeEmojis',
+        'statusreplytext': 'statusReplyText'
+      };
+      const updateKey = statusKeyMap[key] || key;
+      let updateValue = value;
+      if (['autoviewstatus', 'autolikestatus', 'autoreplystatus'].includes(key)) {
+        updateValue = ['on', 'true', 'yes', '1'].includes(value.toLowerCase()) ? 'true' : 'false';
+      }
+      await updateAutoStatusSettings({ [updateKey]: updateValue });
+      displayName = updateKey;
+      success = true;
+    } else if (presenceVars.includes(key)) {
+      const presenceKeyMap = { 'privatechat': 'privateChat', 'groupchat': 'groupChat' };
+      const updateKey = presenceKeyMap[key] || key;
+      const validValues = ['off', 'online', 'typing', 'recording'];
+      if (!validValues.includes(value.toLowerCase())) {
+        return reply(`*Invalid value!*\n\nValid options: ${validValues.join(', ')}`);
+      }
+      await updatePresenceSettings({ [updateKey]: value.toLowerCase() });
+      displayName = updateKey;
+      success = true;
+    } else if (key === 'autoread') {
+      const status = ['on', 'true', 'yes', '1'].includes(value.toLowerCase());
+      const { AutoReadDB } = require('../adams/database/autoread');
+      const settings = await AutoReadDB.findOne();
+      if (settings) {
+        await settings.update({ status });
+      } else {
+        await AutoReadDB.create({ status, chatTypes: ['private', 'group'] });
+      }
+      displayName = 'autoread';
+      success = true;
+    } else if (key === 'antidelete') {
+      const status = ['on', 'true', 'yes', '1'].includes(value.toLowerCase());
+      await updateAntiDeleteSettings({ status });
+      displayName = 'antidelete';
+      success = true;
+    } else if (key === 'anticall') {
+      const status = ['on', 'true', 'yes', '1'].includes(value.toLowerCase());
+      await updateAntiCallSettings({ status });
+      displayName = 'anticall';
+      success = true;
+    } else if (key === 'autobio') {
+      const enabled = ['on', 'true', 'yes', '1'].includes(value.toLowerCase());
+      await updateAutoBioSettings({ enabled });
+      displayName = 'autobio';
+      success = true;
+    }
+
+    if (success) {
+      return reply(
+        `*Variable Updated*\n━━━━━━━━━━━━━━\n\n` +
+        `*Variable:* ${displayName}\n` +
+        `*Value:* ${value}\n` +
+        `*Status:* Saved`
+      );
+    } else {
+      return reply(`*Variable "${key}" not recognized*\n\nUse \`.allvar\` to see available variables`);
+    }
+  } catch (err) {
+    console.error("Setvar error:", err);
+    return reply("*Failed to update variable:* " + err.message);
+  }
+});
+
+bwmxmd({
+  pattern: "systeminfo",
+  react: "📊",
+  aliases: ["sysinfo", "botstatus", "runtime"],
+  category: "Settings",
+  description: "View system information and runtime status"
+},
+async (from, client, conText) => {
+  const { reply, isSuperUser, botSettings } = conText;
+
+  if (!isSuperUser) return reply("*Owner only command*");
+
+  const uptime = process.uptime();
+  const hours = Math.floor(uptime / 3600);
+  const mins = Math.floor((uptime % 3600) / 60);
+  const secs = Math.floor(uptime % 60);
+
+  const memUsage = process.memoryUsage();
+  const heapUsed = Math.round(memUsage.heapUsed / 1024 / 1024);
+  const heapTotal = Math.round(memUsage.heapTotal / 1024 / 1024);
+  const rss = Math.round(memUsage.rss / 1024 / 1024);
+
+  let msg = `*BWM-XMD SYSTEM INFO*\n`;
+  msg += `━━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+  msg += `*RUNTIME*\n`;
+  msg += `├ Uptime: ${hours}h ${mins}m ${secs}s\n`;
+  msg += `├ Node: ${process.version}\n`;
+  msg += `├ Platform: ${process.platform}\n`;
+  msg += `└ Arch: ${process.arch}\n\n`;
+
+  msg += `*MEMORY*\n`;
+  msg += `├ Heap: ${heapUsed}/${heapTotal}MB\n`;
+  msg += `└ RSS: ${rss}MB\n\n`;
+
+  msg += `*BOT*\n`;
+  msg += `├ Name: ${botSettings?.botname || 'BWM-XMD'}\n`;
+  msg += `├ Mode: ${botSettings?.mode || 'public'}\n`;
+  msg += `├ Device: ${botSettings?.deviceMode || 'Android'}\n`;
+  msg += `└ Prefix: ${botSettings?.prefix || '.'}\n\n`;
+
+  msg += `━━━━━━━━━━━━━━━━━━━━━\n`;
+  msg += `*Status:* Online`;
+
+  return reply(msg);
+});
+
+

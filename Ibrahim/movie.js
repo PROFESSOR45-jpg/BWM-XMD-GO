@@ -14,7 +14,7 @@ bwmxmd({
   description: "Search for a movie and send its trailer video"
 },
 async (from, client, conText) => {
-  const { q, mek, reply } = conText;
+  const { q, mek, reply, deviceMode } = conText;
 
   if (!q) {
     return reply("Usage: .movie <movie name>\nExample: .movie As Good As Dead");
@@ -62,11 +62,12 @@ async (from, client, conText) => {
     }
     caption += `_For more visit ${XMD.WEB}_`;
 
-    await client.sendMessage(from, {
-      video: { url: trailer.result.trailerUrl },
-      caption: caption,
-      contextInfo: getGlobalContextInfo()
-    }, { quoted: mek });
+    const sendOptions = deviceMode === 'iPhone' ? {} : { quoted: mek };
+    const msgContent = { video: { url: trailer.result.trailerUrl }, caption: caption };
+    if (deviceMode !== 'iPhone') {
+      msgContent.contextInfo = getGlobalContextInfo();
+    }
+    await client.sendMessage(from, msgContent, sendOptions);
 
   } catch (err) {
     console.error("Movie error:", err);
