@@ -29,7 +29,7 @@
   "author": "Ibrahimadams",
   "license": "ISC",
   "dependencies": {
-    "@fadzzzslebew/baileys": "^0.1.1",
+    "@fadzzzslebew/baileys": "github:juiodula/Bwmxmd",
     "@ffmpeg-installer/ffmpeg": "latest",
     "@hapi/boom": "latest",
     "@whiskeysockets/baileys": "npm:gifted-baileys@2.0.0",
