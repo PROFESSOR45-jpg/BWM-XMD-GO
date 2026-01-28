@@ -255,7 +255,7 @@ bwmxmd({
       day: "numeric", month: "short", year: "numeric"
     });
 
-    const repoUrl = botSettings?.gurl || repoData.html_url || 'https://github.com/Bwmxmd254/BWM-XMD-GO';
+    const repoUrl = 'github.com/Bwmxmd254/BWM-XMD-GO';
 
     const messageText =
       `📌 *${BOT_NAME} REPO INFO*\n\n` +
@@ -263,8 +263,8 @@ bwmxmd({
       `🍴 Forks: ${repoData.forks_count * 2}\n` +
       `📅 Created: ${createdDate}\n` +
       `🕰 Updated: ${lastUpdateDate}\n` +
-      `👤 Owner: ${author}\n` +
-      `🔗 Repo: ${repoUrl}\n\n` +
+      `👤 Owner: ${author}\n\n` +
+      `🔗 Repo Url\n ${repoUrl}\n\n` +
       `_Reply *1* for random NCS audio_\n\n` +
       `_For more visit ${XMD.WEB}_`;
 
