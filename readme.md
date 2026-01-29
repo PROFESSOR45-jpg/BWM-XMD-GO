@@ -9,7 +9,7 @@
 
 <!-- Banner Image -->
 <p align="center">
-  <img src="https://files.catbox.moe/4g4g3i.jpg" width="90%" height="auto">
+  <img src="https://files.catbox.moe/4g4g3i.jpg" width="85%" height="auto">
 </p>
 
 ---
@@ -52,12 +52,26 @@ Once configured, your bot will be ready to use!
 
 ## 🖼️ **Bot Screenshots**
 
-<p align="center">
-  <img src="https://files.catbox.moe/i5ax9j.jpg" width="45%" style="margin:5px;">
-  <img src="https://files.catbox.moe/h316gy.jpg" width="45%" style="margin:5px;">
-  <br>
-  <img src="https://files.catbox.moe/7xz8lv.jpg" width="45%" style="margin:5px;">
-</p>
+<div align="center">
+  <table>
+    <tr>
+      <td align="center">
+        <img src="https://files.catbox.moe/i5ax9j.jpg" width="300"><br>
+        <small><i>Bot Interface</i></small>
+      </td>
+      <td align="center">
+        <img src="https://files.catbox.moe/h316gy.jpg" width="300"><br>
+        <small><i>Features Panel</i></small>
+      </td>
+    </tr>
+    <tr>
+      <td align="center" colspan="2">
+        <img src="https://files.catbox.moe/7xz8lv.jpg" width="320"><br>
+        <small><i>Control Panel</i></small>
+      </td>
+    </tr>
+  </table>
+</div>
 
 ---
 
