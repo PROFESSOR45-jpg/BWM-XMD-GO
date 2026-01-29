@@ -26,7 +26,7 @@ Click the button below to quickly generate your WhatsApp session ID:
 </p>
 
 ### **Step 2: Configure Settings**
-After deployment, configure your bot:
+Before deployment, configure your bot:
 - **Option A:** Edit `config.env` file
 - **Option B:** Use environment variables on your hosting platform
 
