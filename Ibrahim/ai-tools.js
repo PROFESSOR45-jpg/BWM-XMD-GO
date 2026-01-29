@@ -33,7 +33,17 @@ async (from, client, conText) => {
     await client.sendMessage(from, {
       video: { url: result },
       mimetype: "video/mp4",
-      caption: `result for: ${q}`
+      caption: `result for: ${q}`,
+      contextInfo: {
+        externalAdReply: {
+          title: "AI Message Assistant",
+          body: "BWM-XMD Bot Support",
+          thumbnailUrl: "https://files.catbox.moe/0v2x1v.jpg",
+          sourceUrl: "https://github.com/Ibrahimadams/BWM-XMD",
+          mediaType: 1,
+          renderLargerThumbnail: false
+        }
+      }
     }, { quoted: mek });
 
   } catch (error) {
@@ -66,7 +76,20 @@ async (from, client, conText) => {
     fs.writeFileSync(filePath, res.data);
 
     // Send image to chat
-    await client.sendMessage(from, { image: { url: filePath }, caption: `Flux result for: ${q}` });
+    await client.sendMessage(from, { 
+      image: { url: filePath }, 
+      caption: `Flux result for: ${q}`,
+      contextInfo: {
+        externalAdReply: {
+          title: "AI Message Assistant",
+          body: "BWM-XMD Bot Support",
+          thumbnailUrl: "https://files.catbox.moe/0v2x1v.jpg",
+          sourceUrl: "https://github.com/Ibrahimadams/BWM-XMD",
+          mediaType: 1,
+          renderLargerThumbnail: false
+        }
+      }
+    });
 
     // Clean up
     fs.unlinkSync(filePath);
@@ -216,7 +239,19 @@ bwmxmd({
         if (src.type === "article") return `${i + 1}. 📘 ${src.title}`;
       }).join("\n");
 
-    const sent = await client.sendMessage(from, { text: caption }, { quoted: mek });
+    const sent = await client.sendMessage(from, { 
+      text: caption,
+      contextInfo: {
+        externalAdReply: {
+          title: "AI Message Assistant",
+          body: "BWM-XMD Bot Support",
+          thumbnailUrl: "https://files.catbox.moe/0v2x1v.jpg",
+          sourceUrl: "https://github.com/Ibrahimadams/BWM-XMD",
+          mediaType: 1,
+          renderLargerThumbnail: false
+        }
+      }
+    }, { quoted: mek });
     const messageId = sent.key.id;
 
     client.ev.on("messages.upsert", async (update) => {
@@ -364,7 +399,19 @@ bwmxmd({
     const cutoutUrl = result.result.data.cutoutUrl;
 
     // Send back the processed image
-    await client.sendMessage(from, { image: { url: cutoutUrl } }, { quoted: mek });
+    await client.sendMessage(from, { 
+      image: { url: cutoutUrl },
+      contextInfo: {
+        externalAdReply: {
+          title: "AI Message Assistant",
+          body: "BWM-XMD Bot Support",
+          thumbnailUrl: "https://files.catbox.moe/0v2x1v.jpg",
+          sourceUrl: "https://github.com/Ibrahimadams/BWM-XMD",
+          mediaType: 1,
+          renderLargerThumbnail: false
+        }
+      }
+    }, { quoted: mek });
 
   } catch (err) {
     console.error("RemoveBG error:", err);
@@ -405,7 +452,19 @@ bwmxmd({
     const { data: result } = await axios.get(XMD.API.AI.GEMINI_VISION(imageUrl, q));
     if (!result?.status || !result?.result) return reply("❌ No response from Vision AI");
 
-    await client.sendMessage(from, { text: result.result }, { quoted: mek });
+    await client.sendMessage(from, { 
+      text: result.result,
+      contextInfo: {
+        externalAdReply: {
+          title: "AI Message Assistant",
+          body: "BWM-XMD Bot Support",
+          thumbnailUrl: "https://files.catbox.moe/0v2x1v.jpg",
+          sourceUrl: "https://github.com/Ibrahimadams/BWM-XMD",
+          mediaType: 1,
+          renderLargerThumbnail: false
+        }
+      }
+    }, { quoted: mek });
 
   } catch (err) {
     console.error("Vision AI error:", err);
@@ -444,7 +503,19 @@ bwmxmd({
     const { data: result } = await axios.get(XMD.API.AI_TOOLS.TRANSCRIBE(mediaUrl));
     if (!result?.status || !result?.result?.text) return reply("❌ No transcription found");
 
-    await client.sendMessage(from, { text: result.result.text }, { quoted: mek });
+    await client.sendMessage(from, { 
+      text: result.result.text,
+      contextInfo: {
+        externalAdReply: {
+          title: "AI Message Assistant",
+          body: "BWM-XMD Bot Support",
+          thumbnailUrl: "https://files.catbox.moe/0v2x1v.jpg",
+          sourceUrl: "https://github.com/Ibrahimadams/BWM-XMD",
+          mediaType: 1,
+          renderLargerThumbnail: false
+        }
+      }
+    }, { quoted: mek });
 
   } catch (err) {
     console.error("Transcription error:", err);
@@ -491,7 +562,19 @@ bwmxmd({
     if (album) txt += `*Album:* ${album}\n`;
     if (release_date) txt += `*Release Date:* ${release_date}`;
 
-    await client.sendMessage(from, { text: txt }, { quoted: mek });
+    await client.sendMessage(from, { 
+      text: txt,
+      contextInfo: {
+        externalAdReply: {
+          title: "AI Message Assistant",
+          body: "BWM-XMD Bot Support",
+          thumbnailUrl: "https://files.catbox.moe/0v2x1v.jpg",
+          sourceUrl: "https://github.com/Ibrahimadams/BWM-XMD",
+          mediaType: 1,
+          renderLargerThumbnail: false
+        }
+      }
+    }, { quoted: mek });
 
   } catch (err) {
     console.error("Shazam error:", err);

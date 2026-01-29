@@ -79,7 +79,6 @@ async (from, client, conText) => {
 
   if (!isSuperUser) return reply("❌ Owner Only Command!");
   if (!isGroup) return reply("❌ This command only works in groups!");
-  if (!isBotAdmin) return reply("❌ Bot must be admin to update group description.");
   if (!q) return reply("✏️ Provide a new description text after the command.");
 
   try {
@@ -104,7 +103,6 @@ async (from, client, conText) => {
 
   if (!isSuperUser) return reply("❌ Owner Only Command!");
   if (!isGroup) return reply("❌ This command only works in groups!");
-  if (!isBotAdmin) return reply("❌ Bot must be admin to update group subject.");
   if (!q) return reply("✏️ Provide a new subject text after the command.");
 
   try {
@@ -129,7 +127,6 @@ async (from, client, conText) => {
 
   if (!isSuperUser) return reply("❌ Owner Only Command!");
   if (!isGroup) return reply("❌ This command only works in groups!");
-  if (!isBotAdmin) return reply("❌ Bot must be admin to demote others.");
 
   try {
     // Fetch group metadata
@@ -176,7 +173,6 @@ async (from, client, conText) => {
 
   if (!isSuperUser) return reply("❌ Owner Only Command!");
   if (!isGroup) return reply("❌ This command only works in groups!");
-  if (!isBotAdmin) return reply("❌ Bot must be an admin to update group profile.");
 
   let tempFilePath;
 
@@ -225,7 +221,6 @@ async (from, client, conText) => {
 
   if (!isSuperUser) return reply("❌ Owner Only Command!");
   if (!isGroup) return reply("This command only works in groups!");
-  if (!isBotAdmin) return reply("❌ Bot must be admin to perform kickall.");
 
   try {
     // 1. Close group (announcement mode)
@@ -420,22 +415,6 @@ async (from, client, conText) => {
   if (!isSuperUser) return reply("❌ Owner Only Command!");
   if (!isGroup) return reply("Groups Only Command only");
 
-  if (!isAdmin) {
-    const userNumber = sender.split('@')[0];
-    return client.sendMessage(from, {
-      text: `@${userNumber} you are not an admin`,
-      mentions: [`${userNumber}@s.whatsapp.net`]
-    });
-  }
-
-  if (!isBotAdmin) {
-    const userNumber = sender.split('@')[0];
-    return client.sendMessage(from, {
-      text: `@${userNumber} This bot is not an admin`,
-      mentions: [`${userNumber}@s.whatsapp.net`]
-    }, { quoted: mek });
-  }
-
   if (!q || isNaN(q)) return reply("⏱️ Provide a valid time in seconds. Example: .opentime 10");
 
   const delay = Number(q);
@@ -467,22 +446,6 @@ async (from, client, conText) => {
   if (!isSuperUser) return reply("❌ Owner Only Command!");
   if (!isGroup) return reply("Groups Only Command only");
 
-  if (!isAdmin) {
-    const userNumber = sender.split('@')[0];
-    return client.sendMessage(from, {
-      text: `@${userNumber} you are not an admin`,
-      mentions: [`${userNumber}@s.whatsapp.net`]
-    });
-  }
-
-  if (!isBotAdmin) {
-    const userNumber = sender.split('@')[0];
-    return client.sendMessage(from, {
-      text: `@${userNumber} This bot is not an admin`,
-      mentions: [`${userNumber}@s.whatsapp.net`]
-    }, { quoted: mek });
-  }
-
   if (!q || isNaN(q)) return reply("⏱️ Provide a valid time in seconds. Example: .closetime 10");
 
   const delay = Number(q);
@@ -512,7 +475,6 @@ async (from, client, conText) => {
   const { reply, isGroup, isBotAdmin } = conText;
 
   if (!isGroup) return reply("This command only works in groups!");
-  if (!isBotAdmin) return reply("Bot is not an admin");
 
   await client.groupToggleEphemeral(from, 0);
   reply("🧼 Disappearing messages have been turned off.");
@@ -530,7 +492,6 @@ async (from, client, conText) => {
   const { reply, isGroup, isBotAdmin } = conText;
 
   if (!isGroup) return reply("This command only works in groups!");
-  if (!isBotAdmin) return reply("Bot is not an admin");
 
   await client.groupToggleEphemeral(from, 86400);
   reply("🕒 Disappearing messages set to 24 hours.");
@@ -548,7 +509,6 @@ async (from, client, conText) => {
   const { reply, isGroup, isBotAdmin } = conText;
 
   if (!isGroup) return reply("This command only works in groups!");
-  if (!isBotAdmin) return reply("Bot is not an admin");
 
   await client.groupToggleEphemeral(from, 604800);
   reply("📆 Disappearing messages set to 7 days.");
@@ -566,7 +526,6 @@ async (from, client, conText) => {
   const { reply, isGroup, isBotAdmin } = conText;
 
   if (!isGroup) return reply("This command only works in groups!");
-  if (!isBotAdmin) return reply("Bot is not an admin");
 
   await client.groupToggleEphemeral(from, 7776000);
   reply("📆 Disappearing messages set to 90 days.");
@@ -583,7 +542,6 @@ async (from, client, conText) => {
   const { reply, isGroup, isBotAdmin } = conText;
 
   if (!isGroup) return reply("This command only works in groups!");
-  if (!isBotAdmin) return reply("Bot is not an admin");
 
   await client.groupRevokeInvite(from);
   const newCode = await client.groupInviteCode(from);
@@ -603,7 +561,6 @@ async (from, client, conText) => {
   const { reply, isGroup, isBotAdmin } = conText;
 
   if (!isGroup) return reply("This command only works in groups!");
-  if (!isBotAdmin) return reply("Bot is not an admin");
 
   const code = await client.groupInviteCode(from);
   reply(`🔗 Group Link:\nhttps://chat.whatsapp.com/${code}`);
@@ -621,8 +578,6 @@ async (from, client, conText) => {
   const { reply, isGroup, isAdmin, isBotAdmin } = conText;
 
   if (!isGroup) return reply("This command is meant for groups");
-  if (!isAdmin) return reply("You need admin privileges");
-  if (!isBotAdmin) return reply("I need admin privileges");
 
   const responseList = await client.groupRequestParticipantsList(from);
 
@@ -647,7 +602,6 @@ async (from, client, conText) => {
   const { reply, q, participants, isSuperUser, isGroup, isBotAdmin, sender, mek, pushName } = conText;
   if (!isSuperUser) return reply("owner only!");
   if (!isGroup) return reply("This command only works in groups!");
-  if (!isBotAdmin) return reply("Bot is not an admin");
   if (!q) return reply("Provide number(s) to add in this format:\n\nadd 2547xxxxxxx");
 
   const groupMetadata = await client.groupMetadata(from);
@@ -767,22 +721,6 @@ async (from, client, conText) => {
   if (!isSuperUser) return reply("❌ Owner Only Command!");
   if (!isGroup) return client.sendMessage(from, { text: "Groups Only Command only" });
 
-  if (!isAdmin) {
-    const userNumber = sender.split('@')[0];
-    return client.sendMessage(from, {
-      text: `@${userNumber} you are not an admin`,
-      mentions: [`${userNumber}@s.whatsapp.net`]
-    });
-  }
-
-  if (!isBotAdmin) {
-    const userNumber = sender.split('@')[0];
-    return client.sendMessage(from, {
-      text: `@${userNumber} This bot is not an admin`,
-      mentions: [`${userNumber}@s.whatsapp.net`]
-    }, { quoted: mek });
-  }
-
   await client.groupSettingUpdate(from, 'not_announcement');
 
   const userNumber = sender.split('@')[0];
@@ -803,22 +741,6 @@ async (from, client, conText) => {
 
   if (!isSuperUser) return reply("❌ Owner Only Command!");
   if (!isGroup) return client.sendMessage(from, { text: "Groups Only Command only" });
-
-  if (!isAdmin) {
-    const userNumber = sender.split('@')[0];
-    return client.sendMessage(from, {
-      text: `@${userNumber} you are not an admin`,
-      mentions: [`${userNumber}@s.whatsapp.net`]
-    });
-  }
-
-  if (!isBotAdmin) {
-    const userNumber = sender.split('@')[0];
-    return client.sendMessage(from, {
-      text: `@${userNumber} This bot is not an admin`,
-      mentions: [`${userNumber}@s.whatsapp.net`]
-    }, { quoted: mek });
-  }
 
   await client.groupSettingUpdate(from, 'announcement');
 
@@ -842,22 +764,6 @@ async (from, client, conText) => {
 
   if (!isSuperUser) return reply("❌ Owner Only Command!");
   if (!isGroup) return reply("This command only works in groups!");
-
-  if (!isAdmin) {
-    const userNumber = sender.split('@')[0];
-    return client.sendMessage(from, {
-      text: `@${userNumber} you are not an admin`,
-      mentions: [`${userNumber}@s.whatsapp.net`]
-    }, { quoted: mek });
-  }
-
-  if (!isBotAdmin) {
-    const userNumber = sender.split('@')[0];
-    return client.sendMessage(from, {
-      text: `@${userNumber} This bot is not an admin`,
-      mentions: [`${userNumber}@s.whatsapp.net`]
-    }, { quoted: mek });
-  }
 
   if (!quotedUser) return reply("Please reply to/quote a user to kick");
 
@@ -905,22 +811,6 @@ bwmxmd({
 
   if (!isGroup) {
     return reply("This command only works in groups!");
-  }
-
-  if (!isAdmin) {
-    const userNumber = sender.split('@')[0];
-    return client.sendMessage(from, { 
-      text: `@${userNumber} you are not an admin`, 
-      mentions: [`${userNumber}@s.whatsapp.net`]
-    }, { quoted: mek });
-  }
-
-  if (!isBotAdmin) {
-    const userNumber = sender.split('@')[0];
-    return client.sendMessage(from, { 
-      text: `@${userNumber} This bot is not an admin`, 
-      mentions: [`${userNumber}@s.whatsapp.net`]
-    }, { quoted: mek });
   }
 
   if (!quotedUser) {
@@ -977,22 +867,6 @@ async (from, client, conText) => {
 
   if (!isSuperUser) return reply("❌ Owner Only Command!");
   if (!isGroup) return reply("This command only works in groups!");
-
-  if (!isAdmin) {
-    const userNumber = sender.split('@')[0];
-    return client.sendMessage(from, {
-      text: `@${userNumber} you are not an admin`,
-      mentions: [`${userNumber}@s.whatsapp.net`]
-    }, { quoted: mek });
-  }
-
-  if (!isBotAdmin) {
-    const userNumber = sender.split('@')[0];
-    return client.sendMessage(from, {
-      text: `@${userNumber} This bot is not an admin`,
-      mentions: [`${userNumber}@s.whatsapp.net`]
-    }, { quoted: mek });
-  }
 
   if (!quotedUser) return reply("Please reply to/quote a user to demote");
 

@@ -1018,3 +1018,18 @@ bwmxmd({
     await reply(`❌ Error: ${error.message}`);
   }
 });
+
+bwmxmd({
+  pattern: "test2",
+  description: "Send plain text to current channel",
+  category: "Owner",
+  filename: __filename
+}, async (from, client, conText) => {
+  try {
+    console.log(`[TEST2] Sending plain text to: ${from}`);
+    const result = await client.sendMessage(from, { text: 'hello box' });
+    console.log(`[TEST2] Result:`, JSON.stringify(result, null, 2));
+  } catch (error) {
+    console.error(`[TEST2] Error:`, error.message);
+  }
+});

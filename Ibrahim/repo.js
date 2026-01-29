@@ -1,4 +1,3 @@
-
 const { bwmxmd } = require('../adams/commandHandler');
 const { sendButtons } = require('gifted-btns');
 const axios = require('axios');
