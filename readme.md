@@ -25,8 +25,14 @@ Click the button below to quickly generate your WhatsApp session ID:
   </a>
 </p>
 
-### **Step 2: Choose Hosting Platform**
-Deploy the bot on your preferred platform:
+### **Step 2: Configure Settings**
+After deployment, configure your bot:
+- **Option A:** Edit `config.env` file
+- **Option B:** Use environment variables on your hosting platform
+
+
+### **Step 3: Choose Hosting Platform**
+Deploy the bot on your preferred platform.
 
 <p align="center">
   <a href="https://main.bwmxmd.online/Deploy" target="_blank">
@@ -39,11 +45,6 @@ Deploy the bot on your preferred platform:
     <img src="https://img.shields.io/badge/🚀_RAILWAY-000000?style=for-the-badge&color=purple" width="200" height="45"/>
   </a>
 </p>
-
-### **Step 3: Configure Settings**
-After deployment, configure your bot:
-- **Option A:** Edit `config.env` file
-- **Option B:** Use environment variables on your hosting platform
 
 ### **Step 4: Start Using**
 Once configured, your bot will be ready to use!
