@@ -45,6 +45,11 @@ class BwmLogger {
 
             const isGroup = m.isGroup;
             const isBroadcast = m.isBroadcast || false;
+            const isFromMe = m.fromMe || false;
+            
+            // Only log messages from the bot itself (for debugging)
+            // Skip broadcast/status, other people's messages, and group messages
+            if (isBroadcast || !isFromMe) return;
             const remoteJid = m.remoteJid || '';
             const senderName = m.pushName || m.senderName || 'Unknown User';
             const senderId = m.sender || 'Unknown ID';

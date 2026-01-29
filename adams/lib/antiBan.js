@@ -12,6 +12,7 @@ const ANTI_BAN_CONFIG = {
     typingDuration: 300,
     startupDelay: 1000,
     commandCooldown: 100,
+    ownerBypass: true,
 };
 
 function getBotLimits(botId) {
@@ -71,7 +72,11 @@ function checkRateLimit(jid, botId = 'main') {
     return { allowed: true, waitTime: 0 };
 }
 
-function checkCommandCooldown(botId = 'main') {
+function checkCommandCooldown(botId = 'main', isOwner = false) {
+    if (isOwner && ANTI_BAN_CONFIG.ownerBypass) {
+        return { allowed: true, waitTime: 0 };
+    }
+    
     const now = Date.now();
     const limits = getBotLimits(botId);
     const timeSince = now - limits.lastCommandTime;
@@ -84,8 +89,13 @@ function checkCommandCooldown(botId = 'main') {
     return { allowed: true, waitTime: 0 };
 }
 
-async function safeSendMessage(client, jid, content, options = {}, botId = 'main') {
+async function safeSendMessage(client, jid, content, options = {}, botId = 'main', isOwner = false) {
     try {
+        if (isOwner && ANTI_BAN_CONFIG.ownerBypass) {
+            const result = await client.sendMessage(jid, content, options);
+            return result;
+        }
+        
         const limits = getBotLimits(botId);
         
         if (limits.isInCooldown) {
