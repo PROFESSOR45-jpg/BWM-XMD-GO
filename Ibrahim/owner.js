@@ -984,31 +984,62 @@ bwmxmd({
   description: "List all active sub-bots",
   category: "Owner"
 }, async (from, client, conText) => {
-  const { reply, react, isSuperUser } = conText;
+  const { reply, react, isSuperUser, isSubBot } = conText;
+
+  if (isSubBot) {
+    return reply("❌ This command can only be used on the main bot!");
+  }
 
   if (!isSuperUser) {
     return reply("❌ Owner Only Command!");
   }
 
   try {
-    const { getAllSubBots } = require('../adams/database/subbots');
-    const bots = await getAllSubBots();
+    const { getActiveBotsCount, activeBots } = require('../adams/subBotManager');
+    
+    let bots = [];
+    let usingDatabase = false;
+    
+    try {
+      const { getAllSubBots } = require('../adams/database/subbots');
+      bots = await getAllSubBots();
+      usingDatabase = true;
+    } catch (dbError) {
+      console.log("Database not available, using activeBots map");
+    }
 
-    if (!bots || bots.length === 0) {
+    if ((!bots || bots.length === 0) && activeBots.size === 0) {
+      return reply("*🤖 No Sub-Bots Deployed*\n\nUse .deploy to add a new bot!");
+    }
+
+    if (!usingDatabase || bots.length === 0) {
+      bots = [];
+      for (const [botId, botClient] of activeBots.entries()) {
+        const phone = botClient.user?.id?.split('@')[0]?.split(':')[0] || 'Unknown';
+        bots.push({ id: botId, phone, status: 'connected', expires_at: null });
+      }
+    }
+
+    if (bots.length === 0) {
       return reply("*🤖 No Sub-Bots Deployed*\n\nUse .deploy to add a new bot!");
     }
 
     let msg = `*🤖 Sub-Bots (${bots.length})*\n━━━━━━━━━━━━━━━\n\n`;
 
     for (const bot of bots) {
-      const status = bot.status === 'connected' ? '🟢' : '🔴';
-      const expiry = new Date(bot.expiresAt).toLocaleDateString();
-      msg += `${status} *Bot #${bot.id}*\n`;
-      msg += `   📱 Status: ${bot.status}\n`;
+      const isRunning = activeBots.has(bot.id);
+      const status = isRunning ? '🟢 Running' : (bot.status === 'connected' ? '🟡 Connected' : '🔴 ' + (bot.status || 'Offline'));
+      const expiry = bot.expires_at ? new Date(bot.expires_at).toLocaleDateString() : 'N/A';
+      const phone = bot.phone || 'Unknown';
+      msg += `*Bot #${bot.id}*\n`;
+      msg += `   📱 Phone: ${phone}\n`;
+      msg += `   📊 Status: ${status}\n`;
       msg += `   ⏰ Expires: ${expiry}\n\n`;
     }
 
-    msg += `*Active Connections:* ${getActiveBotsCount()}`;
+    msg += `━━━━━━━━━━━━━━━\n`;
+    msg += `*Active Connections:* ${getActiveBotsCount()}\n\n`;
+    msg += `_To stop a bot, use:_ *.stopbot <id>*\n_Example: .stopbot 1_`;
     
     await reply(msg);
 
@@ -1016,6 +1047,70 @@ bwmxmd({
     console.error("subbots error:", error);
     await react("❌");
     await reply(`❌ Error: ${error.message}`);
+  }
+});
+
+bwmxmd({
+  pattern: "stopbot",
+  aliases: ["logoutbot", "disconnectbot", "removebot"],
+  react: "🛑",
+  description: "Stop/logout a specific sub-bot by ID",
+  category: "Owner"
+}, async (from, client, conText) => {
+  const { reply, react, isSuperUser, q, isSubBot } = conText;
+
+  if (isSubBot) {
+    return reply("❌ This command can only be used on the main bot!");
+  }
+
+  if (!isSuperUser) {
+    return reply("❌ Owner Only Command!");
+  }
+
+  if (!q || isNaN(parseInt(q))) {
+    return reply("❌ Please provide a valid bot ID.\n\nUsage: .stopbot <id>\nExample: .stopbot 1\n\nUse .subbots to see all bots and their IDs.");
+  }
+
+  const botId = parseInt(q);
+
+  try {
+    const { stopSubBot, activeBots } = require('../adams/subBotManager');
+    
+    let botRecord = null;
+    try {
+      const { getSubBot } = require('../adams/database/subbots');
+      botRecord = await getSubBot(botId);
+    } catch (dbError) {
+      console.log("Database not available for stopbot");
+    }
+
+    const isRunning = activeBots.has(botId);
+    
+    if (!isRunning && !botRecord) {
+      return reply(`❌ Bot #${botId} not found.`);
+    }
+    
+    if (isRunning) {
+      const runningClient = activeBots.get(botId);
+      const phone = runningClient?.user?.id?.split('@')[0]?.split(':')[0] || botRecord?.phone || 'Unknown';
+      await stopSubBot(botId);
+      await react("✅");
+      return reply(`✅ *Bot #${botId} Stopped Successfully*\n\n📱 Phone: ${phone}\n🔌 Status: Logged out\n\n_The bot has been disconnected and will no longer respond to messages._`);
+    } else {
+      if (botRecord) {
+        try {
+          const { updateSubBotStatus } = require('../adams/database/subbots');
+          await updateSubBotStatus(botId, 'stopped');
+        } catch (e) {}
+      }
+      await react("⚠️");
+      return reply(`⚠️ *Bot #${botId} Updated*\n\n📱 Phone: ${botRecord?.phone || 'Unknown'}\n📊 Status: Was not running (marked as stopped)\n\n_The bot was not actively running but has been marked as stopped._`);
+    }
+
+  } catch (error) {
+    console.error("stopbot error:", error);
+    await react("❌");
+    await reply(`❌ Error stopping bot: ${error.message}`);
   }
 });
 
